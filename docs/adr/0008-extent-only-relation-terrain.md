@@ -25,7 +25,7 @@ inner holes, no role logic (inner members sit inside the hull anyway).
 - **Robust** to bbox-clipped/open relations — a coordinate cloud always has a hull.
 - **Simple**: no multipolygon stitching; just resolve member ways → points → hull.
 - **Position-accurate**: centroid/bbox of the hull give the right octant/edge.
-- **Loses true shape**: concave bodies are over-filled (a lake's bend disappears) and
+- **Loses true shape**: concave bodies are over-filled (a long lake's bend disappears) and
   area is overstated. Acceptable — shape is unused. If a later feature renders terrain
   shape (ASCII map, React), revisit with real ring assembly then.
 - Barriers remain ways-only (linear); only area terrain uses relations.

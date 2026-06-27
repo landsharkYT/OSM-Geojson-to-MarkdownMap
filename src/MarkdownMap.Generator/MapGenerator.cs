@@ -100,7 +100,7 @@ public sealed class MapGenerator
     {
         if (terrain.Count == 0) return;
 
-        // Group by (kind, name) so repeated segments (e.g. several "Route 9" ways) become one entry.
+        // Group by (kind, name) so repeated segments (e.g. several ways of one freeway) become one entry.
         var entries = terrain
             .GroupBy(f => (kind: f.Properties.Kind, name: NameOf(f.Properties)))
             .Select(g =>

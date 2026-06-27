@@ -34,7 +34,6 @@ body/bodies in the Terrain block with a sensible position (e.g. a lake on the W/
 hand-reviewed. No real data committed.
 
 ## Outcome
-Built and green (81 tests). The sample extract's Terrain block now shows its water:
-`a lake (water) · NW edge · open water` and `a bay (water) · NE · open water`,
-both from multipolygon relations the previous ways-only pass missed. The step-4 water gap
-is closed.
+Built and green (81 tests). The sample extract's Terrain block now shows its water bodies,
+e.g. `<Lake> (water) · NW edge · open water`, sourced from multipolygon relations the
+previous ways-only pass missed. The step-4 water gap is closed.
