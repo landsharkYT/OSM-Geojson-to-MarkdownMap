@@ -19,6 +19,13 @@ Feature to its few nearest neighbors, then prune to a planar, sparse graph (Gabr
 relative-neighborhood style) so the schematic stays clean. This needs only feature
 coordinates, which survive the GeoJSON contract perfectly.
 
+> **Amendment (Generator v0):** the proximity graph ships first as **nearest-k (k≈3)
+> without** Gabriel/RNG pruning. Planar pruning removes *crossing edges*, which only
+> matters when a 2D diagram is *drawn* — the structured-text Connections list (ADR-0004)
+> has no visual crossings, so planarity buys nothing there. Nearest-k already gives
+> sparsity. Gabriel/RNG pruning is therefore deferred to the **ASCII-view** milestone,
+> which does need planarity.
+
 **Road-network Connections (path routing) are deferred**, not rejected.
 
 However, "roads" splits into two features of very different cost, and the cheap half

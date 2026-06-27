@@ -17,10 +17,12 @@ All fields are whitespace-stripped. `·` separates header fields, `—` precedes
 
 ### Feature header
 ```
-[NN] <name> (<category>) · on <street> · <district>
+[NN] <name> (<category>)[ · on <street>][ · <district>]
 ```
-`^\[(\d+)\] (.+?) \((.+?)\) · (?:on|near) (.+?) · (.+)$`
-(`near` instead of `on` signals a snapped/fallback street.)
+`^\[(\d+)\] (.+?) \((.+?)\)(?: · (?:on|near) (.+?))?(?: · (.+))?$`
+The `· on <street>` and `· <district>` segments are **optional** — present only when the
+source GeoJSON carries that data. (`near` instead of `on` signals a snapped/fallback
+street.) Generator v0 (POI-only input) emits just `[NN] <name> (<category>)`.
 
 ### Connection
 ```
