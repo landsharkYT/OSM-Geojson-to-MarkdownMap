@@ -24,12 +24,12 @@ var outputPath = args.Length >= 2
 var fc = new OsmNormalizer().NormalizeFile(inputPath);
 File.WriteAllText(outputPath, JsonSerializer.Serialize(fc, NormalizerJson.Options));
 
-var byTier = fc.Features
-    .GroupBy(f => f.Properties.Tier)
-    .OrderBy(g => g.Key)
+var byKind = fc.Features
+    .GroupBy(f => f.Properties.Kind)
+    .OrderBy(g => g.Key, StringComparer.Ordinal)
     .Select(g => $"{g.Key}:{g.Count()}");
 
 Console.WriteLine($"title: {fc.Properties.Title}");
-Console.WriteLine($"features (poi): {fc.Features.Count}  [{string.Join(", ", byTier)}]");
+Console.WriteLine($"features: {fc.Features.Count}  [{string.Join(", ", byKind)}]");
 Console.WriteLine($"wrote: {outputPath}");
 return 0;

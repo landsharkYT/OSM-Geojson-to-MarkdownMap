@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using MarkdownMap.Contract;
 
@@ -34,4 +36,29 @@ public static class GeoJsonReader
                     $"Feature {f.Properties.OsmId} has unreadable Point coordinates ({coords?.GetType().Name ?? "null"}).");
         }
     }
+
+    /// <summary>The vertices of a LineString feature (barriers).</summary>
+    public static IReadOnlyList<LonLat> LineOf(Feature f) => Positions(f.Geometry.Coordinates);
+
+    /// <summary>The outer ring of a Polygon feature (water/park).</summary>
+    public static IReadOnlyList<LonLat> PolygonOuterOf(Feature f)
+    {
+        switch (f.Geometry.Coordinates)
+        {
+            case double[][][] rings when rings.Length > 0:
+                return Positions(rings[0]);
+            case JsonElement je when je.ValueKind == JsonValueKind.Array && je.GetArrayLength() > 0:
+                return Positions(je[0]);
+            default:
+                return System.Array.Empty<LonLat>();
+        }
+    }
+
+    private static IReadOnlyList<LonLat> Positions(object? coords) => coords switch
+    {
+        double[][] arr => arr.Where(p => p.Length >= 2).Select(p => new LonLat(p[0], p[1])).ToList(),
+        JsonElement je when je.ValueKind == JsonValueKind.Array =>
+            je.EnumerateArray().Select(p => new LonLat(p[0].GetDouble(), p[1].GetDouble())).ToList(),
+        _ => System.Array.Empty<LonLat>(),
+    };
 }

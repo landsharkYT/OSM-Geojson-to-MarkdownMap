@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MarkdownMap.Contract;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.Simplify;
 using OsmSharp;
 using OsmSharp.Streams;
 using OsmSharp.Tags;
@@ -33,6 +35,8 @@ public sealed class OsmNormalizer
         var poiWays = new List<(long id, Dictionary<string, string> tags, long[] nodes)>();
         var roadWays = new List<(string name, long[] nodes)>();
         var placeNodes = new List<(long id, string name, double lon, double lat)>();
+        var barrierWays = new List<(long id, string label, string cls, long[] nodes)>();
+        var areaWays = new List<(long id, string kind, string name, long[] nodes)>();
         var titleNames = new List<string>();
 
         double minLon = double.MaxValue, minLat = double.MaxValue;
@@ -63,6 +67,10 @@ public sealed class OsmNormalizer
                     var wtags = ToDict(w.Tags);
                     if (wtags.ContainsKey("highway") && wtags.TryGetValue("name", out var rname))
                         roadWays.Add((rname, w.Nodes));
+                    if (TerrainClassifier.Barrier(wtags) is var (blabel, bcls) && blabel is not null)
+                        barrierWays.Add((wid, blabel, bcls!, w.Nodes));
+                    if (TerrainClassifier.Area(wtags) is var (akind, aname) && akind is not null)
+                        areaWays.Add((wid, akind, aname!, w.Nodes));
                     if (Classifier.Classify(wtags) is not null)
                         poiWays.Add((wid, wtags, w.Nodes));
                     break;
@@ -83,6 +91,18 @@ public sealed class OsmNormalizer
 
         foreach (var (id, name, lon, lat) in placeNodes)
             features.Add(MakePlace("n" + id, name, lon, lat));
+
+        foreach (var (id, label, cls, nodes) in barrierWays)
+        {
+            var line = BuildSimplifiedLine(nodes, nodeCoords);
+            if (line is not null) features.Add(MakeBarrier("w" + id, label, cls, line));
+        }
+
+        foreach (var (id, kind, name, nodes) in areaWays)
+        {
+            var ring = BuildSimplifiedRing(nodes, nodeCoords);
+            if (ring is not null) features.Add(MakeArea("w" + id, kind, name, ring));
+        }
 
         // Deterministic ordering for stable diffs.
         features.Sort((a, b) => string.CompareOrdinal(a.Properties.OsmId, b.Properties.OsmId));
@@ -130,6 +150,57 @@ public sealed class OsmNormalizer
         Properties = new FeatureProperties { Kind = "place", Name = name, OsmId = osmId },
         Geometry = new ContractGeometry { Type = "Point", Coordinates = new[] { Round(lon), Round(lat) } },
     };
+
+    private static Feature MakeBarrier(string osmId, string label, string cls, double[][] line) => new Feature
+    {
+        Properties = new FeatureProperties { Kind = "barrier", Name = label, OsmId = osmId, BarrierClass = cls },
+        Geometry = new ContractGeometry { Type = "LineString", Coordinates = line },
+    };
+
+    private static Feature MakeArea(string osmId, string kind, string name, double[][][] poly) => new Feature
+    {
+        Properties = new FeatureProperties { Kind = kind, Name = name, OsmId = osmId },
+        Geometry = new ContractGeometry { Type = "Polygon", Coordinates = poly },
+    };
+
+    private const double SimplifyToleranceDeg = 0.000045; // ~5 m
+
+    private static double[][]? BuildSimplifiedLine(
+        long[] nodeIds, IReadOnlyDictionary<long, (double lon, double lat)> coords)
+    {
+        var seq = ResolveSeq(nodeIds, coords);
+        if (seq.Count < 2) return null;
+        var line = GeometryFactory.Default.CreateLineString(seq.ToArray());
+        var simp = DouglasPeuckerSimplifier.Simplify(line, SimplifyToleranceDeg);
+        var c = simp.Coordinates.Length >= 2 ? simp.Coordinates : line.Coordinates;
+        return c.Select(p => new[] { Round(p.X), Round(p.Y) }).ToArray();
+    }
+
+    private static double[][][]? BuildSimplifiedRing(
+        long[] nodeIds, IReadOnlyDictionary<long, (double lon, double lat)> coords)
+    {
+        var seq = ResolveSeq(nodeIds, coords);
+        if (seq.Count >= 1 && !seq[0].Equals2D(seq[seq.Count - 1])) seq.Add(seq[0].Copy());
+        if (seq.Count < 4) return null;
+        try
+        {
+            var poly = GeometryFactory.Default.CreatePolygon(GeometryFactory.Default.CreateLinearRing(seq.ToArray()));
+            var simp = DouglasPeuckerSimplifier.Simplify(poly, SimplifyToleranceDeg);
+            var ring = simp is Polygon p && !p.IsEmpty ? p.ExteriorRing.Coordinates : poly.ExteriorRing.Coordinates;
+            return new[] { ring.Select(c => new[] { Round(c.X), Round(c.Y) }).ToArray() };
+        }
+        catch { return null; }
+    }
+
+    private static List<Coordinate> ResolveSeq(
+        long[] nodeIds, IReadOnlyDictionary<long, (double lon, double lat)> coords)
+    {
+        var seq = new List<Coordinate>(nodeIds.Length);
+        foreach (var id in nodeIds)
+            if (coords.TryGetValue(id, out var c))
+                seq.Add(new Coordinate(c.lon, c.lat));
+        return seq;
+    }
 
     private static List<Road> ResolveRoads(
         List<(string name, long[] nodes)> roadWays,

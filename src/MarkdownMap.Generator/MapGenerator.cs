@@ -44,13 +44,20 @@ public sealed class MapGenerator
         var adjacency = ProximityGraph.Build(points, _opts.NeighborsPerFeature);
         var district = points.Select(p => Districts.Nearest(p, anchors)).ToList(); // aligned to promoted
 
+        var barriers = fc.Features.Where(f => f.Properties.Kind == "barrier")
+            .Select(f => (label: NameOf(f.Properties), line: GeoJsonReader.LineOf(f)))
+            .Where(b => b.line.Count >= 2).ToList();
+        var terrain = fc.Features
+            .Where(f => f.Properties.Kind is "water" or "park" or "barrier").ToList();
+
         var sb = new StringBuilder();
         sb.Append("# MARKDOWNMAP — ").Append(Title(fc)).Append("\n\n");
         if (_opts.DirectivePreamble) AppendPreamble(sb);
-        AppendHowToRead(sb, hasDistricts);
+        AppendHowToRead(sb, hasDistricts, terrain.Count > 0);
         AppendBounds(sb, fc);
+        AppendTerrain(sb, terrain, fc.Properties.Bounds);
         if (hasDistricts) AppendDistricts(sb, promoted, points, district, minors, anchors, Token);
-        AppendConnections(sb, promoted, points, district, adjacency, Token);
+        AppendConnections(sb, promoted, points, district, adjacency, barriers, Token);
         return sb.ToString();
     }
 
@@ -70,7 +77,7 @@ public sealed class MapGenerator
         sb.Append("<!-- /DIRECTIVE PREAMBLE -->\n\n");
     }
 
-    private static void AppendHowToRead(StringBuilder sb, bool hasDistricts)
+    private static void AppendHowToRead(StringBuilder sb, bool hasDistricts, bool hasTerrain)
     {
         sb.Append("## How to read this map\n\n");
         sb.Append("- **Feature header** = `[token] Name (category)`");
@@ -79,10 +86,41 @@ public sealed class MapGenerator
         sb.Append("  feature, the named one lies `<metres>` away in compass direction `<DIR>` (N = north/up;\n");
         sb.Append("  8-wind: N NE E SE S SW W NW). `<size>`: **adjacent** <25 m · **near** <150 m ·\n");
         sb.Append("  **short walk** <500 m · **far** ≥500 m.\n");
+        if (hasTerrain)
+            sb.Append("- A `[crosses <barrier>]` flag means a barrier (freeway, rail, river) lies between the\n  two features — **not** a walkable hop. **Terrain & barriers** lists water, parks, and\n  barriers with their rough position for orientation.\n");
         if (hasDistricts)
             sb.Append("- **Districts** group features; `spine:` lists them in order along the district's axis;\n  `clustered:` counts minor features not shown individually.\n");
         sb.Append("- Layout is **not to scale** — only the numbers and compass letters are real. Neighbours\n");
         sb.Append("  are straight-line closeness, not road distance.\n\n");
+    }
+
+    private static readonly string[] TerrainKindOrder = { "water", "park", "barrier" };
+
+    private void AppendTerrain(StringBuilder sb, List<Feature> terrain, double[] bounds)
+    {
+        if (terrain.Count == 0) return;
+
+        // Group by (kind, name) so repeated segments (e.g. several "Route 9" ways) become one entry.
+        var entries = terrain
+            .GroupBy(f => (kind: f.Properties.Kind, name: NameOf(f.Properties)))
+            .Select(g =>
+            {
+                bool linear = g.Key.kind == "barrier";
+                var coords = g.SelectMany(f => linear ? GeoJsonReader.LineOf(f) : GeoJsonReader.PolygonOuterOf(f)).ToList();
+                string cls = g.First().Properties.BarrierClass ?? "";
+                string kindLabel = linear ? "barrier:" + cls : g.Key.kind;
+                string note = g.Key.kind switch { "water" => "open water", "park" => "green space", _ => "impassable except at crossings" };
+                return (g.Key.kind, g.Key.name, kindLabel, note, pos: TerrainPosition.Describe(coords, bounds, linear), empty: coords.Count == 0);
+            })
+            .Where(e => !e.empty)
+            .OrderBy(e => System.Array.IndexOf(TerrainKindOrder, e.kind))
+            .ThenBy(e => e.name, StringComparer.Ordinal);
+
+        sb.Append("## Terrain & barriers\n\n");
+        foreach (var e in entries)
+            sb.Append("- ").Append(e.name).Append(" (").Append(e.kindLabel).Append(") · ")
+              .Append(e.pos).Append(" · ").Append(e.note).Append('\n');
+        sb.Append('\n');
     }
 
     private static void AppendBounds(StringBuilder sb, FeatureCollection fc)
@@ -153,7 +191,8 @@ public sealed class MapGenerator
 
     private void AppendConnections(
         StringBuilder sb, List<Feature> promoted, List<LonLat> points, List<string?> district,
-        IReadOnlyList<IReadOnlyList<int>> adjacency, Func<int, string> token)
+        IReadOnlyList<IReadOnlyList<int>> adjacency,
+        List<(string label, IReadOnlyList<LonLat> line)> barriers, Func<int, string> token)
     {
         sb.Append("## Connections\n\n```\n");
         for (int i = 0; i < promoted.Count; i++)
@@ -175,10 +214,31 @@ public sealed class MapGenerator
                 if (_opts.InlineNeighborName) sb.Append(' ').Append(NameOf(promoted[j].Properties));
                 sb.Append(" — ~").Append(Geo.RoundMeters(dist).ToString(CultureInfo.InvariantCulture)).Append("m ")
                   .Append(Geo.EightWind(points[i], points[j])).Append(", ")
-                  .Append(Geo.Bucket(dist, _opts.Buckets)).Append('\n');
+                  .Append(Geo.Bucket(dist, _opts.Buckets));
+                var crossed = CrossedBarrier(points[i], points[j], barriers);
+                if (crossed is not null) sb.Append(" [crosses ").Append(crossed).Append(']');
+                sb.Append('\n');
             }
             if (i < promoted.Count - 1) sb.Append('\n');
         }
         sb.Append("```\n");
+    }
+
+    private static string? CrossedBarrier(
+        LonLat a, LonLat b, List<(string label, IReadOnlyList<LonLat> line)> barriers)
+    {
+        string? best = null;
+        foreach (var (label, line) in barriers)
+        {
+            for (int s = 0; s + 1 < line.Count; s++)
+            {
+                if (Geo.SegmentsCross(a, b, line[s], line[s + 1]))
+                {
+                    if (best is null || string.CompareOrdinal(label, best) < 0) best = label;
+                    break;
+                }
+            }
+        }
+        return best;
     }
 }

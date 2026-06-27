@@ -51,6 +51,17 @@ public static class Geo
     public static int RoundMeters(double meters, int step = 5) =>
         (int)(Math.Round(meters / step) * step);
 
+    /// <summary>True if open segments a–b and c–d properly cross (planar lon/lat; collinear touches ignored).</summary>
+    public static bool SegmentsCross(LonLat a, LonLat b, LonLat c, LonLat d)
+    {
+        double d1 = Cross(c, d, a), d2 = Cross(c, d, b);
+        double d3 = Cross(a, b, c), d4 = Cross(a, b, d);
+        return ((d1 > 0) != (d2 > 0)) && ((d3 > 0) != (d4 > 0));
+    }
+
+    private static double Cross(LonLat o, LonLat p, LonLat q) =>
+        (p.Lon - o.Lon) * (q.Lat - o.Lat) - (p.Lat - o.Lat) * (q.Lon - o.Lon);
+
     private static double Rad(double d) => d * Math.PI / 180.0;
     private static double Deg(double r) => r * 180.0 / Math.PI;
 }

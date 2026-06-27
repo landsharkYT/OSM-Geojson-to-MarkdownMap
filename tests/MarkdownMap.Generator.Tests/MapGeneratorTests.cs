@@ -44,9 +44,27 @@ public class MapGeneratorTests
         Assert.Contains("<!-- DIRECTIVE PREAMBLE", md);
         Assert.Contains("## How to read this map", md);
         Assert.Contains("**Bounds:**", md);
+        Assert.Contains("## Terrain & barriers", md); // fixture has water/park/barrier
         Assert.Contains("## Districts", md);          // fixture has place anchors
         Assert.Contains("## Connections", md);
-        Assert.DoesNotContain("## Terrain", md);      // no water/park data yet
+    }
+
+    [Fact]
+    public void Terrain_block_lists_water_park_and_barrier_with_positions()
+    {
+        var md = Generate();
+        Assert.Contains("- Mill Lake (water) · W · open water", md);
+        Assert.Contains("- Riverside Park (park) · N · green space", md);
+        Assert.Contains("- Route 9 (barrier:motorway) · runs N–S, E · impassable except at crossings", md);
+    }
+
+    [Fact]
+    public void Edges_crossing_a_barrier_are_flagged()
+    {
+        var md = Generate();
+        // Riverside School (E of Route 9) ↔ the Main Street strip (W) must cross.
+        Assert.Contains("[crosses Route 9]", md);
+        Assert.Matches(@"→ \[04\] Riverside School — ~\d+m \w+, \w+ \[crosses Route 9\]", md);
     }
 
     [Fact]

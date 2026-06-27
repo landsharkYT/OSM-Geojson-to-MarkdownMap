@@ -3,7 +3,7 @@
   "properties": {
     "schemaVersion": 1,
     "title": "Old Town & Harborside, Rivertown",
-    "bounds": [-120.5003, 45.5195, -120.4990, 45.5210]
+    "bounds": [-120.5008, 45.5194, -120.4990, 45.5212]
   },
   "features": [
     { "type": "Feature", "properties": { "kind": "place", "name": "Old Town", "osmId": "n9001" },
@@ -39,6 +39,13 @@
     { "type": "Feature", "properties": { "kind": "poi", "name": "Dock Lofts", "osmId": "n2003", "category": "residential.apartments", "importance": 40, "tier": "minor" },
       "geometry": { "type": "Point", "coordinates": [-120.4999, 45.5197] } },
     { "type": "Feature", "properties": { "kind": "poi", "name": "Pier Cottages", "osmId": "n2004", "category": "residential.house", "importance": 40, "tier": "minor" },
-      "geometry": { "type": "Point", "coordinates": [-120.5001, 45.5196] } }
+      "geometry": { "type": "Point", "coordinates": [-120.5001, 45.5196] } },
+
+    { "type": "Feature", "properties": { "kind": "barrier", "name": "Route 9", "osmId": "w5001", "barrierClass": "motorway" },
+      "geometry": { "type": "LineString", "coordinates": [[-120.4995, 45.5194], [-120.4995, 45.5211]] } },
+    { "type": "Feature", "properties": { "kind": "water", "name": "Mill Lake", "osmId": "w5002" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-120.5007, 45.5199], [-120.5004, 45.5199], [-120.5004, 45.5205], [-120.5007, 45.5205], [-120.5007, 45.5199]]] } },
+    { "type": "Feature", "properties": { "kind": "park", "name": "Riverside Park", "osmId": "w5003" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-120.5001, 45.5209], [-120.4997, 45.5209], [-120.4997, 45.5212], [-120.5001, 45.5212], [-120.5001, 45.5209]]] } }
   ]
 }

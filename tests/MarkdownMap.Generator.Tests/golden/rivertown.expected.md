@@ -17,12 +17,21 @@ is unknown — say so rather than guessing.
   feature, the named one lies `<metres>` away in compass direction `<DIR>` (N = north/up;
   8-wind: N NE E SE S SW W NW). `<size>`: **adjacent** <25 m · **near** <150 m ·
   **short walk** <500 m · **far** ≥500 m.
+- A `[crosses <barrier>]` flag means a barrier (freeway, rail, river) lies between the
+  two features — **not** a walkable hop. **Terrain & barriers** lists water, parks, and
+  barriers with their rough position for orientation.
 - **Districts** group features; `spine:` lists them in order along the district's axis;
   `clustered:` counts minor features not shown individually.
 - Layout is **not to scale** — only the numbers and compass letters are real. Neighbours
   are straight-line closeness, not road distance.
 
-**Bounds:** 45.5195 N,-120.5003 W → 45.521 N,-120.499 E · **North is up.**
+**Bounds:** 45.5194 N,-120.5008 W → 45.5212 N,-120.499 E · **North is up.**
+
+## Terrain & barriers
+
+- Mill Lake (water) · W · open water
+- Riverside Park (park) · N · green space
+- Route 9 (barrier:motorway) · runs N–S, E · impassable except at crossings
 
 ## Districts
 
@@ -56,9 +65,9 @@ clustered: ~2 minor
    → [01] Founders Mural — ~55m N, near
 
 [04] Riverside School (civic.school) · near 10th Street · Harborside
-   → [08] Rivertown Market — ~95m NW, near
-   → [09] Mill Street Deli — ~95m NW, near
-   → [10] Pino's Pizza — ~100m W, near
+   → [08] Rivertown Market — ~95m NW, near [crosses Route 9]
+   → [09] Mill Street Deli — ~95m NW, near [crosses Route 9]
+   → [10] Pino's Pizza — ~100m W, near [crosses Route 9]
 
 [05] The Anchor Tavern (food.bar) · on Main Street · Old Town
    → [06] Bluebird Coffee — ~15m SE, adjacent
@@ -85,17 +94,17 @@ clustered: ~2 minor
    → [07] Corner Cafe — ~20m NW, adjacent
    → [06] Bluebird Coffee — ~20m N, adjacent
    → [10] Pino's Pizza — ~25m SW, near
-   → [04] Riverside School — ~95m SE, near
+   → [04] Riverside School — ~95m SE, near [crosses Route 9]
 
 [09] Mill Street Deli (food.deli) · on Main Street · Harborside
    → [08] Rivertown Market — ~15m NE, adjacent
    → [10] Pino's Pizza — ~15m SW, adjacent
    → [07] Corner Cafe — ~25m N, adjacent
-   → [04] Riverside School — ~95m SE, near
+   → [04] Riverside School — ~95m SE, near [crosses Route 9]
 
 [10] Pino's Pizza (food.restaurant) · on Main Street · Harborside
    → [09] Mill Street Deli — ~15m NE, adjacent
    → [08] Rivertown Market — ~25m NE, near
    → [07] Corner Cafe — ~35m N, near
-   → [04] Riverside School — ~100m E, near
+   → [04] Riverside School — ~100m E, near [crosses Route 9]
 ```

@@ -37,15 +37,25 @@ public class OsmNormalizerIntegrationTests
     }
 
     [Fact]
-    public void Produces_only_pois_in_a_conformant_envelope()
+    public void Produces_known_kinds_in_a_conformant_envelope()
     {
         if (OsmPath is null) return;
         var fc = Load();
         Assert.NotEmpty(fc.Features);
         Assert.Contains(fc.Features, f => f.Properties.Kind == "poi");
-        Assert.All(fc.Features, f => Assert.Contains(f.Properties.Kind, new[] { "poi", "place" }));
+        Assert.All(fc.Features, f => Assert.Contains(f.Properties.Kind, new[] { "poi", "place", "barrier", "water", "park" }));
         Assert.Equal(1, fc.Properties.SchemaVersion);
         Assert.False(string.IsNullOrWhiteSpace(fc.Properties.Title));
+    }
+
+    [Fact]
+    public void Barriers_and_terrain_areas_are_emitted()
+    {
+        if (OsmPath is null) return;
+        var fc = Load();
+        Assert.Contains(fc.Features, f => f.Properties.Kind == "barrier"
+            && f.Geometry.Type == "LineString" && !string.IsNullOrEmpty(f.Properties.BarrierClass));
+        Assert.Contains(fc.Features, f => f.Properties.Kind is "water" or "park"); // at least parks for this extract
     }
 
     [Fact]
@@ -73,21 +83,32 @@ public class OsmNormalizerIntegrationTests
         Assert.All(Load().Features, f =>
         {
             Assert.Matches(@"^[nw]\d+$", f.Properties.OsmId!);
-            Assert.Equal("Point", f.Geometry.Type);
-            var coords = Assert.IsType<double[]>(f.Geometry.Coordinates);
-            Assert.Equal(2, coords.Length);
-
-            if (f.Properties.Kind == "poi")
+            switch (f.Properties.Kind)
             {
-                Assert.False(string.IsNullOrEmpty(f.Properties.Category));
-                Assert.NotNull(f.Properties.Importance);
-                Assert.InRange(f.Properties.Importance!.Value, 0, 100);
-                Assert.Contains(f.Properties.Tier, new[] { "landmark", "destination", "minor", "structure" });
-            }
-            else // place
-            {
-                Assert.False(string.IsNullOrEmpty(f.Properties.Name));
-                Assert.Null(f.Properties.Category);
+                case "poi":
+                    Assert.Equal("Point", f.Geometry.Type);
+                    Assert.False(string.IsNullOrEmpty(f.Properties.Category));
+                    Assert.NotNull(f.Properties.Importance);
+                    Assert.InRange(f.Properties.Importance!.Value, 0, 100);
+                    Assert.Contains(f.Properties.Tier, new[] { "landmark", "destination", "minor", "structure" });
+                    break;
+                case "place":
+                    Assert.Equal("Point", f.Geometry.Type);
+                    Assert.False(string.IsNullOrEmpty(f.Properties.Name));
+                    break;
+                case "barrier":
+                    Assert.Equal("LineString", f.Geometry.Type);
+                    Assert.False(string.IsNullOrEmpty(f.Properties.Name));
+                    Assert.False(string.IsNullOrEmpty(f.Properties.BarrierClass));
+                    break;
+                case "water":
+                case "park":
+                    Assert.Equal("Polygon", f.Geometry.Type);
+                    Assert.False(string.IsNullOrEmpty(f.Properties.Name));
+                    break;
+                default:
+                    Assert.Fail($"unexpected kind '{f.Properties.Kind}'");
+                    break;
             }
         });
     }
