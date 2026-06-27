@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MarkdownMap.Contract/MarkdownMap.Contract.csproj" />
+    <Project Path="src/MarkdownMap.Normalizer/MarkdownMap.Normalizer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MarkdownMap.Normalizer.Tests/MarkdownMap.Normalizer.Tests.csproj" />
+  </Folder>
+</Solution>

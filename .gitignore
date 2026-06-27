@@ -1,0 +1,19 @@
+# .NET build output
+bin/
+obj/
+*.user
+
+# graphify (generated locally; refreshed by post-commit hook, not versioned)
+graphify-out/
+
+# sample / real-location data — never committed (privacy: avoids tying the repo to a
+# real place). Bring your own .osm locally; tests skip when none is present.
+*.osm
+*.pbf
+samples/
+ProposedMap.md
+
+# local tool state
+.opencode/
+.claude/settings.local.json
+.opencode
