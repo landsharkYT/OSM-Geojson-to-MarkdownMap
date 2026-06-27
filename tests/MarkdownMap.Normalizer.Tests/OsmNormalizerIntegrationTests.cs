@@ -42,7 +42,8 @@ public class OsmNormalizerIntegrationTests
         if (OsmPath is null) return;
         var fc = Load();
         Assert.NotEmpty(fc.Features);
-        Assert.All(fc.Features, f => Assert.Equal("poi", f.Properties.Kind));
+        Assert.Contains(fc.Features, f => f.Properties.Kind == "poi");
+        Assert.All(fc.Features, f => Assert.Contains(f.Properties.Kind, new[] { "poi", "place" }));
         Assert.Equal(1, fc.Properties.SchemaVersion);
         Assert.False(string.IsNullOrWhiteSpace(fc.Properties.Title));
     }
@@ -51,9 +52,18 @@ public class OsmNormalizerIntegrationTests
     public void No_rp_noise_leaks_through()
     {
         if (OsmPath is null) return;
-        var fc = Load();
+        var pois = Load().Features.Where(f => f.Properties.Kind == "poi");
         string[] noise = { "parking", "bench", "tree", "waste", "bicycle_parking" };
-        Assert.DoesNotContain(fc.Features, f => noise.Any(n => f.Properties.Category!.Contains(n)));
+        Assert.DoesNotContain(pois, f => noise.Any(n => f.Properties.Category!.Contains(n)));
+    }
+
+    [Fact]
+    public void Place_anchors_and_street_attribution_are_emitted()
+    {
+        if (OsmPath is null) return;
+        var fc = Load();
+        Assert.Contains(fc.Features, f => f.Properties.Kind == "place");           // district anchors
+        Assert.Contains(fc.Features, f => f.Properties.Kind == "poi" && !string.IsNullOrEmpty(f.Properties.Street));
     }
 
     [Fact]
@@ -63,13 +73,22 @@ public class OsmNormalizerIntegrationTests
         Assert.All(Load().Features, f =>
         {
             Assert.Matches(@"^[nw]\d+$", f.Properties.OsmId!);
-            Assert.False(string.IsNullOrEmpty(f.Properties.Category));
-            Assert.NotNull(f.Properties.Importance);
-            Assert.InRange(f.Properties.Importance!.Value, 0, 100);
-            Assert.Contains(f.Properties.Tier, new[] { "landmark", "destination", "minor", "structure" });
             Assert.Equal("Point", f.Geometry.Type);
             var coords = Assert.IsType<double[]>(f.Geometry.Coordinates);
             Assert.Equal(2, coords.Length);
+
+            if (f.Properties.Kind == "poi")
+            {
+                Assert.False(string.IsNullOrEmpty(f.Properties.Category));
+                Assert.NotNull(f.Properties.Importance);
+                Assert.InRange(f.Properties.Importance!.Value, 0, 100);
+                Assert.Contains(f.Properties.Tier, new[] { "landmark", "destination", "minor", "structure" });
+            }
+            else // place
+            {
+                Assert.False(string.IsNullOrEmpty(f.Properties.Name));
+                Assert.Null(f.Properties.Category);
+            }
         });
     }
 

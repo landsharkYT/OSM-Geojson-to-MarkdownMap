@@ -39,14 +39,16 @@ street.) Generator v0 (POI-only input) emits just `[NN] <name> (<category>)`.
 
 ### District block
 ```
-### <name> — <blurb>
-spine: <text, leading with N→S/E→W token order>
-across: <token-list> <note>        (optional)
-promoted: <token-range-or-list>
-clustered: ~<n> <note>
+### <name>[ — <blurb>]
+spine: <DIR>[ along <street>]: <key tokens, axis-ordered>
+promoted: <count>
+clustered: ~<n> minor          (optional; omitted when 0)
 ```
-Key lines match `^(spine|across|promoted|clustered): (.+)$`. Token lists are
-comma-separated `[NN]`; ranges `[NN]-[MM]` expand inclusive.
+Key lines match `^(spine|promoted|clustered): (.+)$`. `<DIR>` is one of N–S / NE–SW /
+E–W / NW–SE. The **spine is a skeleton** — only the few highest-importance ("key")
+features, listed in axis order — not full membership. `promoted` is a **count**; exact
+membership is carried per feature in the Connection header's `· <district>` segment.
+(`across:` for cross-district links is deferred until barriers exist.)
 
 ## Worked example — how a consuming LLM uses it
 

@@ -17,6 +17,8 @@ namespace MarkdownMap.Normalizer;
 public sealed class OsmNormalizer
 {
     private static readonly string[] TitlePlaces = { "neighbourhood", "quarter", "suburb" };
+    private static readonly HashSet<string> AnchorPlaces = new(StringComparer.Ordinal) { "neighbourhood", "quarter" };
+    private const double StreetSnapRadiusMeters = 30.0;
 
     public FeatureCollection NormalizeFile(string path)
     {
@@ -29,6 +31,8 @@ public sealed class OsmNormalizer
         var nodeCoords = new Dictionary<long, (double lon, double lat)>();
         var poiNodes = new List<(long id, Dictionary<string, string> tags, double lon, double lat)>();
         var poiWays = new List<(long id, Dictionary<string, string> tags, long[] nodes)>();
+        var roadWays = new List<(string name, long[] nodes)>();
+        var placeNodes = new List<(long id, string name, double lon, double lat)>();
         var titleNames = new List<string>();
 
         double minLon = double.MaxValue, minLat = double.MaxValue;
@@ -48,28 +52,37 @@ public sealed class OsmNormalizer
 
                     var ntags = ToDict(n.Tags);
                     CollectTitle(ntags, titleNames);
+                    if (ntags.TryGetValue("place", out var place) && AnchorPlaces.Contains(place)
+                        && ntags.TryGetValue("name", out var pname))
+                        placeNodes.Add((nid, pname, lon, lat));
                     if (Classifier.Classify(ntags) is not null)
                         poiNodes.Add((nid, ntags, lon, lat));
                     break;
 
                 case Way w when w.Id is long wid && w.Nodes is { Length: > 0 }:
                     var wtags = ToDict(w.Tags);
+                    if (wtags.ContainsKey("highway") && wtags.TryGetValue("name", out var rname))
+                        roadWays.Add((rname, w.Nodes));
                     if (Classifier.Classify(wtags) is not null)
                         poiWays.Add((wid, wtags, w.Nodes));
                     break;
             }
         }
 
+        var roads = ResolveRoads(roadWays, nodeCoords);
         var features = new List<Feature>();
 
         foreach (var (id, tags, lon, lat) in poiNodes)
-            features.Add(MakePoi("n" + id, tags, lon, lat));
+            features.Add(MakePoi("n" + id, tags, lon, lat, roads));
 
         foreach (var (id, tags, nodes) in poiWays)
         {
             if (TryRepresentativePoint(nodes, nodeCoords, out var lon, out var lat))
-                features.Add(MakePoi("w" + id, tags, lon, lat));
+                features.Add(MakePoi("w" + id, tags, lon, lat, roads));
         }
+
+        foreach (var (id, name, lon, lat) in placeNodes)
+            features.Add(MakePlace("n" + id, name, lon, lat));
 
         // Deterministic ordering for stable diffs.
         features.Sort((a, b) => string.CompareOrdinal(a.Properties.OsmId, b.Properties.OsmId));
@@ -88,10 +101,13 @@ public sealed class OsmNormalizer
         };
     }
 
-    private static Feature MakePoi(string osmId, IReadOnlyDictionary<string, string> tags, double lon, double lat)
+    private static Feature MakePoi(
+        string osmId, IReadOnlyDictionary<string, string> tags, double lon, double lat,
+        IReadOnlyList<Road> roads)
     {
         var c = Classifier.Classify(tags)!;
         tags.TryGetValue("name", out var name);
+        var (street, approx) = StreetSnapper.Assign(tags, (lon, lat), roads, StreetSnapRadiusMeters);
         return new Feature
         {
             Properties = new FeatureProperties
@@ -102,11 +118,33 @@ public sealed class OsmNormalizer
                 Category = c.Category,
                 Importance = c.Importance,
                 Tier = c.Tier,
-                Street = null,        // street attribution lands in a later step
-                StreetApprox = null,
+                Street = street,
+                StreetApprox = street is not null && approx ? true : (bool?)null,
             },
             Geometry = new ContractGeometry { Type = "Point", Coordinates = new[] { Round(lon), Round(lat) } },
         };
+    }
+
+    private static Feature MakePlace(string osmId, string name, double lon, double lat) => new Feature
+    {
+        Properties = new FeatureProperties { Kind = "place", Name = name, OsmId = osmId },
+        Geometry = new ContractGeometry { Type = "Point", Coordinates = new[] { Round(lon), Round(lat) } },
+    };
+
+    private static List<Road> ResolveRoads(
+        List<(string name, long[] nodes)> roadWays,
+        IReadOnlyDictionary<long, (double lon, double lat)> coords)
+    {
+        var roads = new List<Road>(roadWays.Count);
+        foreach (var (name, nodes) in roadWays)
+        {
+            var pts = new List<(double lon, double lat)>(nodes.Length);
+            foreach (var id in nodes)
+                if (coords.TryGetValue(id, out var c))
+                    pts.Add(c);
+            if (pts.Count >= 2) roads.Add(new Road(name, pts));
+        }
+        return roads;
     }
 
     private static bool TryRepresentativePoint(

@@ -25,6 +25,9 @@ public sealed class GeneratorOptions
     /// <summary>Print each edge under both endpoints (`connections.bidirectional`).</summary>
     public bool Bidirectional { get; set; } = true;
 
+    /// <summary>Max key features listed on a district spine (skeleton, not full membership).</summary>
+    public int SpineKeyCap { get; set; } = 8;
+
     /// <summary>Print the neighbour's name on each connection line (`connections.inlineNeighborName`).</summary>
     public bool InlineNeighborName { get; set; } = true;
 

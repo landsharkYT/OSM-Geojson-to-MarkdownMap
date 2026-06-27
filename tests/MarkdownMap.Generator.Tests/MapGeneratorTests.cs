@@ -38,15 +38,40 @@ public class MapGeneratorTests
     }
 
     [Fact]
-    public void Emits_expected_sections_and_omits_unavailable_ones()
+    public void Emits_expected_sections()
     {
         var md = Generate();
         Assert.Contains("<!-- DIRECTIVE PREAMBLE", md);
         Assert.Contains("## How to read this map", md);
         Assert.Contains("**Bounds:**", md);
+        Assert.Contains("## Districts", md);          // fixture has place anchors
         Assert.Contains("## Connections", md);
-        Assert.DoesNotContain("## Districts", md);   // no place data yet
-        Assert.DoesNotContain("## Terrain", md);     // no water/park data yet
+        Assert.DoesNotContain("## Terrain", md);      // no water/park data yet
+    }
+
+    [Fact]
+    public void Connection_headers_carry_street_and_district()
+    {
+        var md = Generate();
+        Assert.Contains("[01] Founders Mural (landmark.artwork) · on Main Street · Old Town", md);
+        Assert.Contains("· near 10th Street · Harborside", md); // streetApprox → "near"
+    }
+
+    [Fact]
+    public void Minors_are_clustered_not_tokenized()
+    {
+        var md = Generate();
+        Assert.Contains("clustered: ~2 minor", md);
+        Assert.DoesNotContain("Maple Apartments", md);  // minor-tier name never rendered
+        Assert.DoesNotContain("residential.apartments", md);
+    }
+
+    [Fact]
+    public void District_block_has_spine_and_promoted_count()
+    {
+        var md = Generate();
+        Assert.Contains("spine: N–S along Main Street: [01],[02],[03],[05],[06]", md);
+        Assert.Contains("promoted: 5", md);
     }
 
     [Fact]
