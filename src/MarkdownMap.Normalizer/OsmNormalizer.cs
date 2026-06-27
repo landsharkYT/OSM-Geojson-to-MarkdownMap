@@ -37,6 +37,8 @@ public sealed class OsmNormalizer
         var placeNodes = new List<(long id, string name, double lon, double lat)>();
         var barrierWays = new List<(long id, string label, string cls, long[] nodes)>();
         var areaWays = new List<(long id, string kind, string name, long[] nodes)>();
+        var wayNodes = new Dictionary<long, long[]>();
+        var areaRelations = new List<(long id, string kind, string name, long[] memberWays)>();
         var titleNames = new List<string>();
 
         double minLon = double.MaxValue, minLat = double.MaxValue;
@@ -65,6 +67,7 @@ public sealed class OsmNormalizer
 
                 case Way w when w.Id is long wid && w.Nodes is { Length: > 0 }:
                     var wtags = ToDict(w.Tags);
+                    wayNodes[wid] = w.Nodes; // buffer for multipolygon relation members
                     if (wtags.ContainsKey("highway") && wtags.TryGetValue("name", out var rname))
                         roadWays.Add((rname, w.Nodes));
                     if (TerrainClassifier.Barrier(wtags) is var (blabel, bcls) && blabel is not null)
@@ -73,6 +76,18 @@ public sealed class OsmNormalizer
                         areaWays.Add((wid, akind, aname!, w.Nodes));
                     if (Classifier.Classify(wtags) is not null)
                         poiWays.Add((wid, wtags, w.Nodes));
+                    break;
+
+                case Relation rel when rel.Id is long relId && rel.Members is { Length: > 0 }:
+                    var reltags = ToDict(rel.Tags);
+                    if (reltags.TryGetValue("type", out var rtype) && rtype == "multipolygon"
+                        && TerrainClassifier.Area(reltags) is var (rkind, rrname) && rkind is not null)
+                    {
+                        var members = rel.Members
+                            .Where(m => m.Type == OsmGeoType.Way)
+                            .Select(m => m.Id).ToArray();
+                        if (members.Length > 0) areaRelations.Add((relId, rkind, rrname!, members));
+                    }
                     break;
             }
         }
@@ -102,6 +117,18 @@ public sealed class OsmNormalizer
         {
             var ring = BuildSimplifiedRing(nodes, nodeCoords);
             if (ring is not null) features.Add(MakeArea("w" + id, kind, name, ring));
+        }
+
+        foreach (var (id, kind, name, memberWays) in areaRelations)
+        {
+            var coords = new List<(double lon, double lat)>();
+            foreach (var wid in memberWays)
+                if (wayNodes.TryGetValue(wid, out var ns))
+                    foreach (var nid in ns)
+                        if (nodeCoords.TryGetValue(nid, out var c))
+                            coords.Add(c);
+            var ring = RelationGeometry.ConvexHullRing(coords);
+            if (ring is not null) features.Add(MakeArea("r" + id, kind, name, new[] { ring }));
         }
 
         // Deterministic ordering for stable diffs.
