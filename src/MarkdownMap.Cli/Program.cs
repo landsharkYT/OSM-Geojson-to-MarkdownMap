@@ -1,13 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using MarkdownMap.Contract;
 using MarkdownMap.Generator;
 using MarkdownMap.Normalizer;
 
 if (args.Length < 1)
 {
-    Console.Error.WriteLine("usage: markdownmap <input.osm|input.geojson> [output.md]");
+    Console.Error.WriteLine("usage: markdownmap <input.osm|input.geojson> [output.md|output.geojson]");
     return 1;
 }
 
@@ -25,7 +26,7 @@ FeatureCollection fc;
 switch (ext)
 {
     case ".osm":
-        fc = new OsmNormalizer().NormalizeFile(input);   // Stage 1 + Stage 2 end-to-end
+        fc = new OsmNormalizer().NormalizeFile(input);   // Stage 1
         break;
     case ".geojson":
     case ".json":
@@ -36,11 +37,19 @@ switch (ext)
         return 1;
 }
 
-var markdown = new MapGenerator().Generate(fc);
-File.WriteAllText(output, markdown);
+// .geojson output = dump Stage 1 contract; otherwise render the MarkdownMap (Stage 2).
+if (Path.GetExtension(output).ToLowerInvariant() == ".geojson")
+{
+    File.WriteAllText(output, JsonSerializer.Serialize(fc, NormalizerJson.Options));
+}
+else
+{
+    File.WriteAllText(output, new MapGenerator().Generate(fc));
+}
 
-var poi = fc.Features.Count(f => f.Properties.Kind == "poi");
+var byKind = fc.Features.GroupBy(f => f.Properties.Kind)
+    .OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key}:{g.Count()}");
 Console.WriteLine($"title: {fc.Properties.Title}");
-Console.WriteLine($"poi features: {poi}");
+Console.WriteLine($"features: {fc.Features.Count}  [{string.Join(", ", byKind)}]");
 Console.WriteLine($"wrote: {output}");
 return 0;

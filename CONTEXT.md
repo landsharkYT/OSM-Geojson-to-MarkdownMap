@@ -84,6 +84,13 @@ offline. No runtime API. A locally-supplied `.osm` extract is one. A live puller
 behind the same seam, but is out of scope. Acquisition is a manual, documented step, not
 built code.
 
+### Explorer (React helper)
+The browser-based helper app. Runs the pipeline **client-side** (.NET WASM, ADR-0009 — the
+input never leaves the browser) and **visualizes the Generator's structure** — tokens,
+proximity edges, districts, terrain, crossing flags — at true geographic positions, beside
+the MarkdownMap it produces. A human-facing *true-geographic* view, complementing the
+LLM-facing *topological* MarkdownMap.
+
 ### Normalizer (Stage 1)
 The OSM-aware front stage. Streams an OSM/XML extract and emits **GeoJSON**,
 translating raw OSM tags (`amenity`, `shop`, `building`, ...) into a stable,
