@@ -29,18 +29,23 @@ Two decoupled stages with **GeoJSON as the hard contract** between them:
 - **Normalizer** (`MarkdownMap.Normalizer`, net10 + OsmSharp/NetTopologySuite) — streams an
   OSM extract, applies an inclusion gate (drops noise), normalizes tags into a typed
   schema, and emits GeoJSON.
-- **Generator** (planned) — consumes GeoJSON and renders the MarkdownMap. Depends only on
-  the contract, so it stays portable.
+- **Generator** (`MarkdownMap.Generator`, netstandard2.0) — consumes GeoJSON, builds a
+  structured `MapModel`, and renders the MarkdownMap from it. Depends only on the contract.
 - **Contract** (`MarkdownMap.Contract`, netstandard2.0) — the shared GeoJSON/schema POCOs.
+- **Explorer** (`web/`) — a React app that runs the whole pipeline **in the browser** via a
+  .NET WASM module (`MarkdownMap.Wasm` / `MarkdownMap.Bridge`) and draws the map (tokens,
+  edges, districts, terrain, crossings) beside the MarkdownMap. Nothing is uploaded (ADR-0009).
 
 ## Status
 
 | Part | State |
 |---|---|
-| Stage 1 Normalizer — POIs → GeoJSON (taxonomy, importance, inclusion gate, centroids) | **built** |
-| Stage 1 — dedup, street-snap, barriers, terrain, districts | planned |
-| Stage 2 Generator (GeoJSON → MarkdownMap) | designed, not built |
-| React webapp helper | deferred |
+| Stage 1 Normalizer — POIs, street-snap, place anchors, barriers, terrain (ways + relations) | **built** |
+| Stage 2 Generator — MarkdownMap + structured MapModel (districts, spines, crossing flags) | **built** |
+| Stage 1 — de-duplication | planned |
+| WASM module (browser pipeline) | **built** |
+| React Explorer (`web/`) — visual map + markdown, client-side | **built (v1)** |
+| Settings playground, scene chunking | deferred |
 
 ## Build & test
 
@@ -49,14 +54,26 @@ dotnet build
 dotnet test          # location-agnostic; integration tests skip if no local .osm
 ```
 
-Run the Normalizer on a local export (you supply the `.osm`):
+Run the full pipeline on a local export (you supply the `.osm`); output extension picks
+MarkdownMap (`.md`) or the Stage-1 GeoJSON (`.geojson`):
 
 ```bash
-dotnet run --project src/MarkdownMap.Normalizer -- your-area.osm out.geojson
+dotnet run --project src/MarkdownMap.Cli -- your-area.osm out.md
+dotnet run --project src/MarkdownMap.Cli -- your-area.osm out.geojson
+```
+
+### Explorer (web)
+
+```bash
+cd web
+npm install
+npm run build:wasm     # publishes MarkdownMap.Wasm → web/public/dotnet (needs the wasm-tools .NET workload)
+npm run dev            # then open the dev URL and drop in a .osm / .geojson
 ```
 
 > **Sample data is not committed.** Bring your own `.osm` (OSM Export / Geofabrik /
-> Overpass). Files matching `*.osm`, `samples/`, and `ProposedMap.md` are git-ignored.
+> Overpass). Files matching `*.osm`, `samples/`, and `ProposedMap.md` are git-ignored. The
+> Explorer parses everything client-side — your data never leaves the browser.
 
 ## Design docs
 
