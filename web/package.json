@@ -16,6 +16,8 @@
   "dependencies": {
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
+    "dompurify": "^3.4.11",
+    "marked": "^18.0.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

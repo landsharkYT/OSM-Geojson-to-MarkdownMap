@@ -22,6 +22,27 @@ body {
   }
 }
 
+/* Rendered MarkdownMap preview (Sidebar "Rendered preview" toggle). Tailwind has no typography
+   plugin here, so style the generated subset explicitly; dark via prefers-color-scheme. */
+.markdown-body { color: #334155; line-height: 1.5; }
+.markdown-body h1 { font-size: 1.05rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
+.markdown-body h2 { font-size: 0.95rem; font-weight: 700; margin: 0.8rem 0 0.3rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.15rem; }
+.markdown-body h3 { font-size: 0.85rem; font-weight: 600; margin: 0.6rem 0 0.2rem; }
+.markdown-body p { margin: 0.4rem 0; }
+.markdown-body ul { margin: 0.3rem 0; padding-left: 1.1rem; list-style: disc; }
+.markdown-body li { margin: 0.1rem 0; }
+.markdown-body strong { font-weight: 700; }
+.markdown-body code { font-family: ui-monospace, monospace; font-size: 0.8em; background: #e2e8f0; padding: 0.05rem 0.25rem; border-radius: 0.2rem; }
+.markdown-body pre { background: #f1f5f9; padding: 0.6rem; border-radius: 0.4rem; overflow-x: auto; margin: 0.4rem 0; }
+.markdown-body pre code { background: none; padding: 0; font-size: 0.78em; line-height: 1.35; }
+
+@media (prefers-color-scheme: dark) {
+  .markdown-body { color: #cbd5e1; }
+  .markdown-body h2 { border-bottom-color: #334155; }
+  .markdown-body code { background: #1e293b; }
+  .markdown-body pre { background: #0b1220; }
+}
+
 /* Indeterminate progress bar (ProgressCard, used while the runtime loads). */
 @keyframes mdmap-indeterminate {
   0%   { transform: translateX(-100%); }

@@ -6,7 +6,7 @@ import { Sidebar } from './components/Sidebar'
 import { ProgressCard, type Progress } from './components/ProgressCard'
 import { LegendPopover } from './components/LegendPopover'
 import { MapViewSettingsPopover } from './components/MapViewSettingsPopover'
-import { loadSettings, saveSettings, type MarkdownMapSettings } from './settings'
+import { loadSettings, saveSettings, loadDisplay, saveDisplay, type MarkdownMapSettings, type MarkdownDisplaySettings } from './settings'
 import { loadMapView, saveMapView, type MapViewSettings } from './mapViewSettings'
 
 export default function App() {
@@ -16,6 +16,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [mapView, setMapView] = useState<MapViewSettings>(loadMapView)
   const [settings, setSettings] = useState<MarkdownMapSettings>(loadSettings)
+  const [display, setDisplay] = useState<MarkdownDisplaySettings>(loadDisplay)
   const [dragging, setDragging] = useState(false)
   const [legendOpen, setLegendOpen] = useState(false)
   const [mapSettingsOpen, setMapSettingsOpen] = useState(false)
@@ -24,6 +25,12 @@ export default function App() {
   function changeMapView(next: MapViewSettings) {
     setMapView(next)
     saveMapView(next)
+  }
+
+  // Display-only (sidebar render mode): persist, no re-render — the markdown text is unchanged.
+  function changeDisplay(next: MarkdownDisplaySettings) {
+    setDisplay(next)
+    saveDisplay(next)
   }
 
   const loading = progress !== null
@@ -150,6 +157,8 @@ export default function App() {
               selected={selected}
               settings={settings}
               onSettingsChange={changeSettings}
+              display={display}
+              onDisplayChange={changeDisplay}
             />
             {/* Re-import over an existing map: dimmed overlay keeps context. */}
             {progress && (

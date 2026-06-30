@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
-import type { MarkdownMapSettings } from '../settings'
+import type { MarkdownDisplaySettings, MarkdownMapSettings } from '../settings'
 
 interface Props {
   settings: MarkdownMapSettings
   onChange: (next: MarkdownMapSettings) => void
+  display: MarkdownDisplaySettings
+  onDisplayChange: (next: MarkdownDisplaySettings) => void
   onClose: () => void
 }
 
@@ -26,7 +28,7 @@ const ITEMS: { key: keyof MarkdownMapSettings; label: string; help: string }[] =
 ]
 
 /** MarkdownMap generation settings (ADR-0011). Render-only knobs; changes re-render live. */
-export function SettingsPopover({ settings, onChange, onClose }: Props) {
+export function SettingsPopover({ settings, onChange, display, onDisplayChange, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -64,6 +66,23 @@ export function SettingsPopover({ settings, onChange, onClose }: Props) {
           </span>
         </label>
       ))}
+
+      {/* Display — affects only how the sidebar paints the markdown, not its text (see settings.ts). */}
+      <div className="mt-1 border-t border-slate-100 pt-1 dark:border-slate-700">
+        <p className="px-1 py-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Display</p>
+        <label className="flex cursor-pointer gap-2 rounded px-1 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+          <input
+            type="checkbox"
+            className="mt-0.5 accent-sky-600"
+            checked={display.rendered}
+            onChange={(e) => onDisplayChange({ ...display, rendered: e.target.checked })}
+          />
+          <span>
+            <span className="block text-sm text-slate-700 dark:text-slate-200">Rendered preview</span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400">Show the MarkdownMap formatted instead of raw text. Copy / Download still use the raw markdown.</span>
+          </span>
+        </label>
+      </div>
     </div>
   )
 }

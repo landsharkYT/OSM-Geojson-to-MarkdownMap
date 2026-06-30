@@ -131,6 +131,13 @@ change re-renders the cached model instantly with no re-parse (ADR-0011). Live +
 (`docs/settings.md`); `bidirectional` stays **on** by default — the toggle exists for terser
 output when the consuming LLM is smart enough to infer the reverse direction.
 
+### Rendered preview
+A **display-only** sidebar toggle (default **off**) that shows the MarkdownMap as formatted
+markdown instead of raw source. Deliberately *not* a [[markdownmap-settings|generation knob]]:
+it never changes the text — Copy / Download still emit the raw markdown — and must not leak into
+the WASM options DTO, so it is persisted separately. Rendering is sanitized (marked + DOMPurify):
+OSM names are user data, so a place literally named `<img onerror=…>` must never execute.
+
 ### Layer toggles
 Checkboxes (Terrain / Edges / Minor features / Tokens) that show or hide **SVG** map layers in
 the human-facing view. A display concern only — they do **not** affect the generated

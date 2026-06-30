@@ -105,6 +105,44 @@ test('MarkdownMap settings re-render the markdown live (no rebuild)', async ({ p
   await expect(md).toContainText('DIRECTIVE PREAMBLE')
 })
 
+test('rendered preview toggle formats the markdown (display-only, no rebuild)', async ({ page }) => {
+  await page.goto('/')
+  await page.setInputFiles('input[type="file"]', fixture)
+  // Raw by default: the source heading shows its literal markdown hashes in a <pre>.
+  await expect(page.locator('pre')).toContainText('# MARKDOWNMAP')
+
+  await page.getByRole('button', { name: 'MarkdownMap settings' }).click()
+  await page.locator('label', { hasText: 'Rendered preview' }).locator('input').check()
+
+  // Now the markdown is parsed to HTML: a real <h1>, real <h2> sections — and no rebuild.
+  await expect(page.locator('.markdown-body h1')).toContainText('MARKDOWNMAP')
+  await expect(page.locator('.markdown-body h2').first()).toBeVisible()
+  await expect(page.getByText('Generating map', { exact: true })).toBeHidden()
+})
+
+test('the sidebar can be resized by dragging its left edge', async ({ page }) => {
+  await page.goto('/')
+  await page.setInputFiles('input[type="file"]', fixture)
+  await expect(page.locator('main svg').getByText('[01]', { exact: true })).toBeVisible()
+
+  const aside = page.locator('aside')
+  const before = (await aside.boundingBox())!.width
+
+  const handle = page.getByRole('separator', { name: 'Resize sidebar' })
+  const hb = (await handle.boundingBox())!
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(hb.x - 120, hb.y + hb.height / 2, { steps: 8 }) // drag left → wider
+  await page.mouse.up()
+
+  const after = (await aside.boundingBox())!.width
+  expect(after).toBeGreaterThan(before + 80)
+
+  // Double-click the handle resets to the default width.
+  await handle.dblclick()
+  expect((await aside.boundingBox())!.width).toBeLessThan(after - 40)
+})
+
 test('clicking a token shows its details', async ({ page }) => {
   await page.goto('/')
   await page.setInputFiles('input[type="file"]', fixture)
