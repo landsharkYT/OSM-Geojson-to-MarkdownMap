@@ -26,3 +26,9 @@ web/public/dotnet/
 .opencode/
 .claude/settings.local.json
 .opencode
+
+# playwright
+web/test-results/
+web/playwright-report/
+web/blob-report/
+.last-run.json

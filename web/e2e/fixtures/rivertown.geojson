@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "properties": { "schemaVersion": 1, "title": "Old Town, Rivertown", "bounds": [-120.5008, 45.5194, -120.4990, 45.5212] },
+  "features": [
+    { "type": "Feature", "properties": { "kind": "place", "name": "Old Town", "osmId": "n9001" },
+      "geometry": { "type": "Point", "coordinates": [-120.5000, 45.5207] } },
+    { "type": "Feature", "properties": { "kind": "poi", "name": "Founders Mural", "osmId": "n1001", "category": "landmark.artwork", "importance": 95, "tier": "landmark", "street": "Main Street" },
+      "geometry": { "type": "Point", "coordinates": [-120.5001, 45.5210] } },
+    { "type": "Feature", "properties": { "kind": "poi", "name": "The Anchor Tavern", "osmId": "n1002", "category": "food.bar", "importance": 65, "tier": "destination", "street": "Main Street" },
+      "geometry": { "type": "Point", "coordinates": [-120.5001, 45.5203] } },
+    { "type": "Feature", "properties": { "kind": "poi", "name": "Riverside School", "osmId": "n1003", "category": "civic.school", "importance": 90, "tier": "landmark", "street": "10th Street", "streetApprox": true },
+      "geometry": { "type": "Point", "coordinates": [-120.4992, 45.5200] } },
+    { "type": "Feature", "properties": { "kind": "barrier", "name": "Route 9", "osmId": "w5001", "barrierClass": "motorway" },
+      "geometry": { "type": "LineString", "coordinates": [[-120.4996, 45.5194], [-120.4996, 45.5211]] } },
+    { "type": "Feature", "properties": { "kind": "water", "name": "Mill Lake", "osmId": "w5002" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-120.5007, 45.5199], [-120.5004, 45.5199], [-120.5004, 45.5205], [-120.5007, 45.5205], [-120.5007, 45.5199]]] } }
+  ]
+}

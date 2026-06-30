@@ -23,12 +23,24 @@ function exports(): Promise<WasmExports> {
   return (exportsPromise ??= load())
 }
 
+function normalize(r: BuildResult): BuildResult {
+  if ('error' in r) return r
+  // Defensive defaults — empty collections may be absent from the JSON.
+  r.features ??= []
+  r.minors ??= []
+  r.edges ??= []
+  r.districts ??= []
+  r.terrain ??= []
+  r.bounds ??= []
+  return r
+}
+
 export async function buildFromOsm(bytes: Uint8Array): Promise<BuildResult> {
   const e = await exports()
-  return JSON.parse(e.MarkdownMapWasm.BuildFromOsm(bytes)) as BuildResult
+  return normalize(JSON.parse(e.MarkdownMapWasm.BuildFromOsm(bytes)) as BuildResult)
 }
 
 export async function buildFromGeoJson(geojson: string): Promise<BuildResult> {
   const e = await exports()
-  return JSON.parse(e.MarkdownMapWasm.BuildFromGeoJson(geojson)) as BuildResult
+  return normalize(JSON.parse(e.MarkdownMapWasm.BuildFromGeoJson(geojson)) as BuildResult)
 }
