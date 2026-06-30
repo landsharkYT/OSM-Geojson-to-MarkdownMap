@@ -1,11 +1,13 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/MarkdownMap.Bridge/MarkdownMap.Bridge.csproj" />
     <Project Path="src/MarkdownMap.Cli/MarkdownMap.Cli.csproj" />
     <Project Path="src/MarkdownMap.Contract/MarkdownMap.Contract.csproj" />
     <Project Path="src/MarkdownMap.Generator/MarkdownMap.Generator.csproj" />
     <Project Path="src/MarkdownMap.Normalizer/MarkdownMap.Normalizer.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/MarkdownMap.Bridge.Tests/MarkdownMap.Bridge.Tests.csproj" />
     <Project Path="tests/MarkdownMap.Generator.Tests/MarkdownMap.Generator.Tests.csproj" />
     <Project Path="tests/MarkdownMap.Normalizer.Tests/MarkdownMap.Normalizer.Tests.csproj" />
   </Folder>

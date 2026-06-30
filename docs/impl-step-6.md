@@ -20,11 +20,14 @@ alongside the MarkdownMap it produces.
    correct MarkdownMap. OsmSharp + NetTopologySuite are viable in WASM; the client-side
    architecture (ADR-0009) holds. (Prereq done: Normalizer is now a *library*, not an exe,
    so it can be referenced by the wasm module; its `.geojson` debug dump moved into the CLI.)
-2. **MapModel refactor** (C#) — extract the Generator's computed structures into a
-   serializable `MapModel`; markdown renderer reads it. No behaviour change (golden holds).
-3. **`MarkdownMap.Wasm`** — `[JSExport] buildMap(inputBytesOrText, optionsJson) → MapModel
-   JSON`. Accepts `.osm` (full pipeline) and `.geojson` (Generator only).
-4. **React app** (`/web`): Vite + React + TS + Tailwind.
+2. **MapModel refactor** (C#) — ✅ **DONE.** `MapGenerator.BuildModel(fc) → MapModel`;
+   markdown rendered from it; golden byte-identical (45 Generator tests). See docs/map-model.md.
+3. **`MarkdownMap.Wasm`** — ✅ **DONE.** Logic in `MarkdownMap.Bridge` (`MapBuilder.FromOsm`
+   / `FromGeoJson` → MapModel JSON; errors as `{"error":…}`; unit-tested). The wasm exe is a
+   thin `[JSExport]` shim (`BuildFromOsm(byte[])`, `BuildFromGeoJson(string)`) and builds for
+   browser-wasm (full pipeline linked). It is **not in the .sln** (needs the wasm-tools
+   workload; build with `dotnet build -c Release` under a wasm-capable SDK).
+4. **React app** (`/web`): Vite + React + TS + Tailwind. ← next
 
 ## v1 features (the explorer)
 - **SVG map** (d3-geo projection, **no basemap tiles**): terrain polygons (water/park) as
