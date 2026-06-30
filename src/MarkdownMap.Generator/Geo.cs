@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace MarkdownMap.Generator;
 
@@ -57,6 +58,39 @@ public static class Geo
         double d1 = Cross(c, d, a), d2 = Cross(c, d, b);
         double d3 = Cross(a, b, c), d4 = Cross(a, b, d);
         return ((d1 > 0) != (d2 > 0)) && ((d3 > 0) != (d4 > 0));
+    }
+
+    /// <summary>
+    /// True if the segment a–b passes through the polygon with outer <paramref name="ring"/>:
+    /// either endpoint lies inside, or the segment crosses any ring edge (ADR-0015 water test).
+    /// Planar lon/lat; the ring may be open or closed.
+    /// </summary>
+    public static bool SegmentCrossesPolygon(LonLat a, LonLat b, IReadOnlyList<LonLat> ring)
+    {
+        if (ring.Count < 3) return false;
+        if (PointInPolygon(a, ring) || PointInPolygon(b, ring)) return true;
+        for (int i = 0; i < ring.Count; i++)
+        {
+            var p = ring[i];
+            var q = ring[(i + 1) % ring.Count];
+            if (SegmentsCross(a, b, p, q)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Ray-casting point-in-polygon (planar lon/lat); the ring may be open or closed.</summary>
+    public static bool PointInPolygon(LonLat pt, IReadOnlyList<LonLat> ring)
+    {
+        bool inside = false;
+        for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+        {
+            var pi = ring[i];
+            var pj = ring[j];
+            if (((pi.Lat > pt.Lat) != (pj.Lat > pt.Lat)) &&
+                (pt.Lon < (pj.Lon - pi.Lon) * (pt.Lat - pi.Lat) / (pj.Lat - pi.Lat) + pi.Lon))
+                inside = !inside;
+        }
+        return inside;
     }
 
     private static double Cross(LonLat o, LonLat p, LonLat q) =>

@@ -10,13 +10,16 @@ export interface Layers {
 
 export interface MapViewSettings {
   layers: Layers
-  /** Terrain drawn soft/faint as approximate orientation context (honest about ADR-0008). */
-  approximateTerrain: boolean
+  /**
+   * Terrain geometry mode (ADR-0013/0014). On = real shapes (rings + shoreline lines);
+   * off = the old convex-hull extent blobs, recomputed client-side.
+   */
+  detailedTerrain: boolean
 }
 
 export const DEFAULT_MAP_VIEW: MapViewSettings = {
   layers: { terrain: true, edges: true, minors: true, tokens: true },
-  approximateTerrain: true,
+  detailedTerrain: true,
 }
 
 const KEY = 'mdmap.mapview'

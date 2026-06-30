@@ -38,12 +38,12 @@ export function MapViewSettingsPopover({ value, onChange, onClose }: Props) {
         <input
           type="checkbox"
           className="mt-0.5 accent-sky-600"
-          checked={value.approximateTerrain}
-          onChange={(e) => onChange({ ...value, approximateTerrain: e.target.checked })}
+          checked={value.detailedTerrain}
+          onChange={(e) => onChange({ ...value, detailedTerrain: e.target.checked })}
         />
         <span>
-          <span className="block text-sm text-slate-700 dark:text-slate-200">Approximate terrain</span>
-          <span className="block text-xs text-slate-500 dark:text-slate-400">Soft, faint areas — honest about rough extent.</span>
+          <span className="block text-sm text-slate-700 dark:text-slate-200">Detailed terrain</span>
+          <span className="block text-xs text-slate-500 dark:text-slate-400">Real shapes &amp; shorelines. Off = coarse extent blobs (old look).</span>
         </span>
       </label>
 

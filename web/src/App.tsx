@@ -124,7 +124,6 @@ export default function App() {
               )}
             </div>
           )}
-          <span className="text-xs text-slate-400">Runs entirely in your browser — nothing is uploaded.</span>
         </div>
       </header>
 
@@ -143,7 +142,7 @@ export default function App() {
                 selected={selected}
                 onSelect={setSelected}
                 layers={mapView.layers}
-                approximateTerrain={mapView.approximateTerrain}
+                detailedTerrain={mapView.detailedTerrain}
               />
             </div>
             <Sidebar
@@ -167,7 +166,7 @@ export default function App() {
             ) : (
               <div className={`rounded-2xl border-2 border-dashed p-12 text-center ${dragging ? 'border-sky-500 bg-sky-50 dark:bg-sky-950' : 'border-slate-300 dark:border-slate-700'}`}>
                 <p className="text-lg font-medium">Drop a <code>.osm</code> or <code>.geojson</code> here</p>
-                <p className="mt-1 text-sm text-slate-500">or use “Open” above. It’s parsed and rendered locally — your data never leaves this page.</p>
+                <p className="mt-1 text-sm text-slate-500">or use “Open” above.</p>
               </div>
             )}
           </div>

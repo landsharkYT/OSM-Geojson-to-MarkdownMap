@@ -40,6 +40,7 @@ export interface Edge {
   dir: string
   bucket: string
   crosses?: string
+  separatedByWater?: boolean
 }
 
 export interface District {

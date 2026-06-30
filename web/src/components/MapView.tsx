@@ -4,6 +4,7 @@ import { zoom, zoomIdentity, type ZoomTransform } from 'd3-zoom'
 import type { MapModel, PromotedFeature } from '../types'
 import { computeBounds, makeProjection } from '../projection'
 import { visibleLabels, type LabelCandidate } from '../labelLayout'
+import { convexHull, type Point } from '../hull'
 import type { Layers } from '../mapViewSettings'
 
 const W = 1000
@@ -16,7 +17,7 @@ interface Props {
   selected: string | null
   onSelect: (token: string | null) => void
   layers: Layers
-  approximateTerrain: boolean
+  detailedTerrain: boolean
 }
 
 /** Deterministic district colour (stable hue from the name). */
@@ -27,16 +28,22 @@ function districtColor(name: string | undefined): string {
   return `hsl(${h} 70% 55%)`
 }
 
-function terrainStyle(kind: string, approximate: boolean) {
+const waterColor = '#0ea5e9'
+const parkColor = '#22c55e'
+const terrainStroke = (kind: string) => (kind === 'water' ? waterColor : parkColor)
+
+// Real assembled rings: moderate fill, solid outline (ADR-0014).
+function realAreaStyle(kind: string) {
   const water = kind === 'water'
-  const base = water ? '56,189,248' : '34,197,94'
-  const stroke = water ? '#0ea5e9' : '#22c55e'
-  return approximate
-    ? { fill: `rgba(${base},0.12)`, stroke, strokeOpacity: 0.5, dash: '4 4' }
-    : { fill: `rgba(${base},${water ? 0.3 : 0.22})`, stroke, strokeOpacity: 1, dash: undefined }
+  return { fill: water ? 'rgba(56,189,248,0.18)' : 'rgba(34,197,94,0.14)', stroke: terrainStroke(kind) }
+}
+// Convex-hull extent blob (Detailed terrain off): soft fill, dashed outline → reads as approximate.
+function hullAreaStyle(kind: string) {
+  const water = kind === 'water'
+  return { fill: water ? 'rgba(56,189,248,0.12)' : 'rgba(34,197,94,0.10)', stroke: terrainStroke(kind) }
 }
 
-export function MapView({ model, selected, onSelect, layers, approximateTerrain }: Props) {
+export function MapView({ model, selected, onSelect, layers, detailedTerrain }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [t, setT] = useState<ZoomTransform>(zoomIdentity)
 
@@ -106,30 +113,42 @@ export function MapView({ model, selected, onSelect, layers, approximateTerrain 
       {/* --- geometry layer: scales with zoom --- */}
       <g transform={`translate(${t.x},${t.y}) scale(${t.k})`}>
         {layers.terrain &&
-          model.terrain.flatMap((te, i) =>
-            te.parts.map((part, j) => {
+          model.terrain.flatMap((te, i) => {
+            // Barriers are always lines, in both modes.
+            if (te.kind === 'barrier')
+              return te.parts.map((part, j) => (
+                <polyline key={`t${i}-${j}`} points={part.map(([lon, lat]) => proj.project(lon, lat).join(',')).join(' ')}
+                  fill="none" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
+              ))
+
+            // Detailed off: collapse the whole area to its convex-hull extent blob (ADR-0008 look).
+            if (!detailedTerrain) {
+              const all: Point[] = te.parts.flatMap((part) => part.map(([lon, lat]) => proj.project(lon, lat)))
+              const hull = convexHull(all)
+              if (hull.length < 3) return []
+              const s = hullAreaStyle(te.kind)
+              return [
+                <polygon key={`h${i}`} points={hull.map((p) => p.join(',')).join(' ')} fill={s.fill}
+                  stroke={s.stroke} strokeOpacity={0.5} strokeDasharray="4 4" strokeWidth={1}
+                  vectorEffect="non-scaling-stroke" />,
+              ]
+            }
+
+            // Detailed on: real shapes — assembled rings filled, clipped shorelines as lines.
+            return te.parts.map((part, j) => {
               const points = part.map(([lon, lat]) => proj.project(lon, lat).join(',')).join(' ')
-              if (te.kind === 'barrier')
+              if (te.geometryType === 'LineString')
                 return (
-                  <polyline key={`t${i}-${j}`} points={points} fill="none"
-                    stroke="#ef4444" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
-                )
-              // Bbox-clipped water/park: a shoreline edge, drawn as a coloured line (no false fill).
-              if (te.geometryType === 'LineString') {
-                const stroke = te.kind === 'water' ? '#0ea5e9' : '#22c55e'
-                return (
-                  <polyline key={`t${i}-${j}`} points={points} fill="none" stroke={stroke}
+                  <polyline key={`t${i}-${j}`} points={points} fill="none" stroke={terrainStroke(te.kind)}
                     strokeWidth={2} strokeOpacity={0.8} vectorEffect="non-scaling-stroke" />
                 )
-              }
-              const s = terrainStyle(te.kind, approximateTerrain)
+              const s = realAreaStyle(te.kind)
               return (
                 <polygon key={`t${i}-${j}`} points={points} fill={s.fill} stroke={s.stroke}
-                  strokeOpacity={s.strokeOpacity} strokeDasharray={s.dash} strokeWidth={1}
-                  vectorEffect="non-scaling-stroke" />
+                  strokeWidth={1} vectorEffect="non-scaling-stroke" />
               )
-            }),
-          )}
+            })
+          })}
 
         {/* proximity links — faint background structure; the selected feature's brighten */}
         {layers.edges &&

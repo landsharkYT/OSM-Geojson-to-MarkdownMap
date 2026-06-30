@@ -17,9 +17,12 @@ is unknown — say so rather than guessing.
   feature, the named one lies `<metres>` away in compass direction `<DIR>` (N = north/up;
   8-wind: N NE E SE S SW W NW). `<size>`: **adjacent** <25 m · **near** <150 m ·
   **short walk** <500 m · **far** ≥500 m.
-- A `[crosses <barrier>]` flag means a barrier (freeway, rail, river) lies between the
-  two features — **not** a walkable hop. **Terrain & barriers** lists water, parks, and
-  barriers with their rough position for orientation.
+- A `[crosses <road>]` flag means a road or rail line lies between the two features —
+  passable at a crossing, but **not** a clean walkable hop.
+- A `[separated by water]` flag means open water (lake, river, or canal) lies between them:
+  the distance is real but you cannot walk it directly. A feature marked `stands apart` is
+  reached only across water. **Terrain & barriers** lists water, parks, and barriers with
+  their rough position for orientation.
 - **Districts** group features; `spine:` lists them in order along the district's axis;
   `clustered:` counts minor features not shown individually.
 - Layout is **not to scale** — only the numbers and compass letters are real. Neighbours

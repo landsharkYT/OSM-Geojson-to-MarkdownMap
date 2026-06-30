@@ -59,9 +59,25 @@ public sealed class MapGenerator
 
         var adjacency = ProximityGraph.Build(points, _opts.NeighborsPerFeature);
         var district = points.Select(p => Districts.Nearest(p, anchors)).ToList();
-        var barriers = fc.Features.Where(f => f.Properties.Kind == "barrier")
+
+        // Barriers split by passability (ADR-0015): road/rail produce a named `[crosses <name>]`
+        // flag; water (river/canal) instead counts as water-separation.
+        var barrierFeatures = fc.Features.Where(f => f.Properties.Kind == "barrier").ToList();
+        var namedBarriers = barrierFeatures
+            .Where(f => f.Properties.BarrierClass != "water")
             .Select(f => (label: NameOf(f.Properties), line: GeoJsonReader.LineOf(f)))
             .Where(b => b.line.Count >= 2).ToList();
+
+        // Water geometry that makes a straight-line link not directly walkable: water-area polygon
+        // rings, bbox-clipped shoreline LineStrings (ADR-0014), and linear river/canal barriers.
+        var waterFeatures = fc.Features.Where(f => f.Properties.Kind == "water").ToList();
+        var waterRings = waterFeatures.Where(f => f.Geometry.Type == "Polygon")
+            .Select(GeoJsonReader.PolygonOuterOf).Where(r => r.Count >= 3).ToList();
+        var waterLines = waterFeatures.Where(f => f.Geometry.Type != "Polygon")
+            .Select(GeoJsonReader.LineOf)
+            .Concat(barrierFeatures.Where(f => f.Properties.BarrierClass == "water")
+                .Select(GeoJsonReader.LineOf))
+            .Where(l => l.Count >= 2).ToList();
 
         // --- promoted features ---
         var features = new List<PromotedFeature>(promotedF.Count);
@@ -114,7 +130,8 @@ public sealed class MapGenerator
                     Meters = Geo.RoundMeters(dist),
                     Dir = Geo.EightWind(points[i], points[j]),
                     Bucket = Geo.Bucket(dist, _opts.Buckets),
-                    Crosses = CrossedBarrier(points[i], points[j], barriers),
+                    Crosses = CrossedBarrier(points[i], points[j], namedBarriers),
+                    SeparatedByWater = CrossesWater(points[i], points[j], waterRings, waterLines),
                 });
             }
         }
@@ -285,7 +302,10 @@ public sealed class MapGenerator
         sb.Append("  8-wind: N NE E SE S SW W NW). `<size>`: **adjacent** <25 m · **near** <150 m ·\n");
         sb.Append("  **short walk** <500 m · **far** ≥500 m.\n");
         if (hasTerrain)
-            sb.Append("- A `[crosses <barrier>]` flag means a barrier (freeway, rail, river) lies between the\n  two features — **not** a walkable hop. **Terrain & barriers** lists water, parks, and\n  barriers with their rough position for orientation.\n");
+        {
+            sb.Append("- A `[crosses <road>]` flag means a road or rail line lies between the two features —\n  passable at a crossing, but **not** a clean walkable hop.\n");
+            sb.Append("- A `[separated by water]` flag means open water (lake, river, or canal) lies between them:\n  the distance is real but you cannot walk it directly. A feature marked `stands apart` is\n  reached only across water. **Terrain & barriers** lists water, parks, and barriers with\n  their rough position for orientation.\n");
+        }
         if (hasDistricts)
             sb.Append("- **Districts** group features; `spine:` lists them in order along the district's axis;\n  `clustered:` counts minor features not shown individually.\n");
         sb.Append("- Layout is **not to scale** — only the numbers and compass letters are real. Neighbours\n");
@@ -344,6 +364,19 @@ public sealed class MapGenerator
             list.Add(e);
         }
 
+        // "Stands apart" (ADR-0015): a feature reachable only across water — *every* incident
+        // proximity link is water-separated. Derived from the full edge set (both directions are
+        // present in the model regardless of the bidirectional render option), so it is stable
+        // even when an edge is printed under the other endpoint.
+        var incident = new Dictionary<string, (int total, int water)>(StringComparer.Ordinal);
+        foreach (var e in edges)
+        {
+            incident.TryGetValue(e.FromToken, out var c);
+            incident[e.FromToken] = (c.total + 1, c.water + (e.SeparatedByWater ? 1 : 0));
+        }
+        bool StandsApart(string token) =>
+            incident.TryGetValue(token, out var c) && c.total > 0 && c.water == c.total;
+
         sb.Append("## Connections\n\n```\n");
         for (int i = 0; i < features.Count; i++)
         {
@@ -353,6 +386,7 @@ public sealed class MapGenerator
             if (!IsCategoryFallbackName(f.Name, f.Category)) sb.Append(" (").Append(f.Category).Append(')');
             if (f.Street is not null) sb.Append(f.StreetApprox ? " · near " : " · on ").Append(f.Street);
             if (f.District is not null) sb.Append(" · ").Append(f.District);
+            if (StandsApart(f.Token)) sb.Append(" · stands apart — reached only across water");
             sb.Append('\n');
 
             if (byFrom.TryGetValue(f.Token, out var fedges))
@@ -362,12 +396,29 @@ public sealed class MapGenerator
                     if (_opts.InlineNeighborName) sb.Append(' ').Append(e.ToName);
                     sb.Append(" — ~").Append(e.Meters.ToString(CultureInfo.InvariantCulture)).Append("m ")
                       .Append(e.Dir).Append(", ").Append(e.Bucket);
+                    if (e.SeparatedByWater) sb.Append(" [separated by water]");
                     if (e.Crosses is not null) sb.Append(" [crosses ").Append(e.Crosses).Append(']');
                     sb.Append('\n');
                 }
             if (i < features.Count - 1) sb.Append('\n');
         }
         sb.Append("```\n");
+    }
+
+    /// <summary>
+    /// True if the straight line a–b passes through water — a water-area polygon, a clipped
+    /// shoreline, or a river/canal (ADR-0015). The honest "not directly walkable" signal.
+    /// </summary>
+    private static bool CrossesWater(
+        LonLat a, LonLat b,
+        List<IReadOnlyList<LonLat>> rings, List<IReadOnlyList<LonLat>> lines)
+    {
+        foreach (var ring in rings)
+            if (Geo.SegmentCrossesPolygon(a, b, ring)) return true;
+        foreach (var line in lines)
+            for (int s = 0; s + 1 < line.Count; s++)
+                if (Geo.SegmentsCross(a, b, line[s], line[s + 1])) return true;
+        return false;
     }
 
     private static string? CrossedBarrier(

@@ -139,9 +139,10 @@ MarkdownMap. Live behind the [[map-view-settings]] button. Distinct from [[markd
 ### Map view settings
 The Explorer's **display-only** settings (ADR-0013), behind a ⚙ button in the header — separate
 from [[markdownmap-settings]] (which change the generated text and run in WASM). Map view
-settings never touch the pipeline: [[layer-toggles]] plus **Approximate terrain** (default on —
-terrain drawn soft/faint as orientation context, honest about the convex-hull extent of
-ADR-0008). Persisted to localStorage; pure client-side SVG state.
+settings never touch the pipeline: [[layer-toggles]] plus **Detailed terrain** (default on),
+which switches terrain *geometry mode* — on = real shapes (rings + shoreline lines, ADR-0014);
+off = the old convex-hull **extent** blobs (ADR-0008's look), recomputed **client-side** from
+the terrain points the Explorer already holds. Persisted to localStorage; pure client-side state.
 
 ### Explorer legend
 The ⓘ popover in the header (ADR-0013) explaining the SVG symbology — crucially that the faint
@@ -174,8 +175,27 @@ nearest-named-road snap). v1 ships street *labels*, not street *routing* — see
 
 ### Barrier / crossing flag
 A `[crosses <barrier>]` flag on a Connection whose straight-line segment intersects a
-known impassable barrier way (e.g. a motorway's geometry). Warns that the proximity edge
-is not actually walkable directly. Computed by segment-vs-polyline intersection.
+barrier way (motorway, rail, or river/canal). Warns that the proximity edge is not actually
+walkable directly. Computed by segment-vs-polyline intersection. Distinct from a
+[[separation-flag]]: roads and rail are *passable* (you cross them), so a crossing flag is
+informational and never on its own makes a Feature [[stands-apart]].
+
+### Separation flag
+A `[separated by water]` tag on a Connection whose straight line passes through a **water
+area** (ADR-0014 polygon) or a `barrier:water` (river/canal). The honest accessibility signal:
+crow-flies distance is real but the link is *not directly walkable*. Phrased "separated by",
+**never "unreachable"** — a bridge or ferry may exist and we don't claim to know. We annotate
+separation; we never compute a route (ADR-0015). Distinct from [[barrier-crossing-flag]] (road/
+rail), which does not imply separation.
+
+### Stands apart
+A per-Feature flag — `stands apart — reached only across water` — set when **every** one of a
+Feature's proximity links is water-[[separation-flag|separated]]. Only water counts (the
+taxonomy has no walls/fences; roads and rail are passable), so the flag stays quiet on ordinary
+features ringed by streets and fires on the genuinely cut-off ones (island, far shore). It keys
+on *the absence of any clean open-land link*, not on an absolute distance, so it is
+scale-invariant across dense and sparse extracts. Derived at render time from the edges; honest
+under incomplete OSM (worst case it is absent, never a false "unreachable").
 
 ### Spine
 A one-line ordering of a District's promoted Features along its main axis (usually a

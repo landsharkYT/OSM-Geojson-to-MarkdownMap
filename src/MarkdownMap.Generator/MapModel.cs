@@ -57,7 +57,8 @@ public sealed class Edge
     public int Meters { get; set; }
     public string Dir { get; set; } = "";   // 8-wind
     public string Bucket { get; set; } = "";
-    public string? Crosses { get; set; }    // barrier label, if the straight line crosses one
+    public string? Crosses { get; set; }    // road/rail barrier label, if the straight line crosses one
+    public bool SeparatedByWater { get; set; }  // straight line passes through water (area or river/canal); ADR-0015
 }
 
 public sealed class District

@@ -32,12 +32,18 @@ feature's links; a "crosses-barrier" edge is shown distinctly from a **barrier**
 both red dashes). An **ⓘ legend** popover in the header names every symbol and states the two
 non-obvious truths: proximity links are **not streets**, terrain is **approximate** extent.
 
-**Terrain as approximate, toggleable.** Terrain is presented soft/faint/back-most by default
-(honest about ADR-0008's convex hull) rather than as a precise shoreline. This is a **toggle**
-(Approximate terrain, default on), not a fixed rule.
+**Detailed terrain, toggleable.** A **"Detailed terrain"** toggle (default on) switches terrain
+*geometry mode*, not just styling (amended after ADR-0014 gave terrain real shapes):
+- **On** → the real shapes: assembled rings as filled polygons, bbox-clipped water as
+  shoreline lines.
+- **Off** → the old **convex-hull extent** blobs (ADR-0008's look), drawn soft/faint with a
+  dashed outline to read as approximate. The hull is **recomputed client-side** (monotone-chain
+  over the terrain points the Explorer already holds) — the pipeline no longer emits hulls
+  (ADR-0014), so this is purely a view, honoring the client-only rule below. Off-mode hulls all
+  area terrain; barriers stay lines.
 
 **Two distinct settings surfaces.** *Map view settings* (this ADR) are **display-only and
-purely client-side** — the layer toggles plus Approximate-terrain, behind a ⚙ in the header,
+purely client-side** — the layer toggles plus Detailed-terrain, behind a ⚙ in the header,
 persisted to localStorage. They never touch the pipeline, which is what separates them from
 *MarkdownMap settings* (ADR-0011, run in WASM, change the generated artifact). Keeping them as
 two surfaces prevents conflating "how the map looks" with "what the map says."
