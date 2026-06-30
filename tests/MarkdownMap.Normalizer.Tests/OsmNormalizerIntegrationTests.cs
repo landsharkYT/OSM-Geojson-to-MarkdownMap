@@ -56,9 +56,11 @@ public class OsmNormalizerIntegrationTests
         Assert.Contains(fc.Features, f => f.Properties.Kind == "barrier"
             && f.Geometry.Type == "LineString" && !string.IsNullOrEmpty(f.Properties.BarrierClass));
         Assert.Contains(fc.Features, f => f.Properties.Kind is "water" or "park");
-        // terrain areas (incl. multipolygon-relation water) are Polygons
+        // Terrain areas are Polygons when their ring closes, or LineString shorelines when a
+        // multipolygon relation is bbox-clipped (ADR-0014); way-based areas always close.
         Assert.All(fc.Features.Where(f => f.Properties.Kind is "water" or "park"),
-            f => Assert.Equal("Polygon", f.Geometry.Type));
+            f => Assert.Contains(f.Geometry.Type, new[] { "Polygon", "LineString" }));
+        Assert.Contains(fc.Features, f => f.Properties.Kind is "water" or "park" && f.Geometry.Type == "Polygon");
     }
 
     [Fact]
@@ -85,7 +87,9 @@ public class OsmNormalizerIntegrationTests
         if (OsmPath is null) return;
         Assert.All(Load().Features, f =>
         {
-            Assert.Matches(@"^[nwr]\d+$", f.Properties.OsmId!); // n=node, w=way, r=relation
+            // n=node, w=way, r=relation; a relation split into outer rings suffixes -k, or a
+            // clipped shoreline -Lk (ADR-0014).
+            Assert.Matches(@"^[nwr]\d+(-L?\d+)?$", f.Properties.OsmId!);
             switch (f.Properties.Kind)
             {
                 case "poi":
@@ -106,7 +110,8 @@ public class OsmNormalizerIntegrationTests
                     break;
                 case "water":
                 case "park":
-                    Assert.Equal("Polygon", f.Geometry.Type);
+                    // Polygon when the ring closes; LineString for a bbox-clipped shoreline (ADR-0014).
+                    Assert.Contains(f.Geometry.Type, new[] { "Polygon", "LineString" });
                     Assert.False(string.IsNullOrEmpty(f.Properties.Name));
                     break;
                 default:

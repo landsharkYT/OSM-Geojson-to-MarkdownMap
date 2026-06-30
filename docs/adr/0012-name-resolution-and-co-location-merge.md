@@ -10,9 +10,9 @@ Refines the feature schema (`docs/feature-schema.md` §3 inclusion gate, §5 imp
 Real OSM extracts produce three kinds of map clutter, visible on a real import:
 
 1. **Nameless POIs** rendered as `[142] unnamed`, promoted as their own tokens.
-2. **Verbose names** (`a long institutional name`).
+2. **Verbose names** (a long institutional name well over the token budget).
 3. **Co-located duplicates** — one place mapped as both an `amenity` **node** and a
-   `building` **way** yields two POIs (`[013]` and `[015]` both "the same church"),
+   `building` **way** yields two POIs (`[013]` and `[015]`, the same church mapped twice),
    often with stray unnamed fragments (a hall, a chapel outline) nearby.
 
 The contract carries only the resolved `name` (plus `category`/`tier`) — **not** the raw

@@ -25,7 +25,7 @@ A single `FeatureCollection`:
 |---|---|---|
 | `kind` | enum | `poi` \| `road` \| `barrier` \| `water` \| `park` \| `place` |
 | `name` | string \| null | resolved `name → brand → operator`, `short_name` preferred when `name` is long (ADR-0012); null = unnamed (rendered as a humanized category label) |
-| `osmId` | string | provenance, e.g. `n29445653`, `w12345` (Stage 2 ignores for ranking) |
+| `osmId` | string | provenance, e.g. `n29445653`, `w12345`, `r123-0` (a relation split into outer rings suffixes `-k`, ADR-0014); Stage 2 ignores for ranking |
 | `category` | string | normalized class.subclass (see §4); poi/place only |
 | `importance` | int 0–100 | computed score (see §5); poi only |
 | `tier` | enum | `landmark` \| `destination` \| `minor` \| `structure`; derived from `importance` |

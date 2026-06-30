@@ -114,6 +114,14 @@ export function MapView({ model, selected, onSelect, layers, approximateTerrain 
                   <polyline key={`t${i}-${j}`} points={points} fill="none"
                     stroke="#ef4444" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
                 )
+              // Bbox-clipped water/park: a shoreline edge, drawn as a coloured line (no false fill).
+              if (te.geometryType === 'LineString') {
+                const stroke = te.kind === 'water' ? '#0ea5e9' : '#22c55e'
+                return (
+                  <polyline key={`t${i}-${j}`} points={points} fill="none" stroke={stroke}
+                    strokeWidth={2} strokeOpacity={0.8} vectorEffect="non-scaling-stroke" />
+                )
+              }
               const s = terrainStyle(te.kind, approximateTerrain)
               return (
                 <polygon key={`t${i}-${j}`} points={points} fill={s.fill} stroke={s.stroke}

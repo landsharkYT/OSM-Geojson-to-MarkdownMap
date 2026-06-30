@@ -198,7 +198,8 @@ public sealed class MapGenerator
             .GroupBy(f => (kind: f.Properties.Kind, name: NameOf(f.Properties)))
             .Select(g =>
             {
-                bool linear = g.Key.kind == "barrier";
+                // Linear = barriers AND bbox-clipped water/park shorelines (ADR-0014), by geometry.
+                bool linear = g.First().Geometry.Type == "LineString";
                 var partsLonLat = g.Select(f => linear ? GeoJsonReader.LineOf(f) : GeoJsonReader.PolygonOuterOf(f))
                     .Where(pl => pl.Count > 0).ToList();
                 var flat = partsLonLat.SelectMany(pl => pl).ToList();
@@ -207,7 +208,7 @@ public sealed class MapGenerator
                 {
                     g.Key.kind,
                     g.Key.name,
-                    kindLabel = linear ? "barrier:" + cls : g.Key.kind,
+                    kindLabel = g.Key.kind == "barrier" ? "barrier:" + cls : g.Key.kind,
                     note = g.Key.kind switch { "water" => "open water", "park" => "green space", _ => "impassable except at crossings" },
                     pos = TerrainPosition.Describe(flat, bounds, linear),
                     empty = flat.Count == 0,

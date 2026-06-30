@@ -185,6 +185,9 @@ frame so it need not triangulate per-Feature bearings.
 ### Terrain
 The orienting context block: named water bodies, parks, and Barriers with their rough
 position, so the LLM knows "the shape of the place" (what's water, what blocks movement).
+The **markdown** projection is deliberately **coarse — name · octant · note** — and stays that
+way: real geometry (ADR-0014 ring assembly) flows into the contract + Explorer SVG, never into
+the markdown text, where coordinate detail would only bloat tokens and degrade LLM reasoning.
 
 ### Topology (connectivity)
 OSM encodes the street/path **graph** via shared node IDs (a node in two ways = an

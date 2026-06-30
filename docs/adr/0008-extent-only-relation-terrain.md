@@ -1,7 +1,8 @@
 # 8. Multipolygon terrain emitted as extent-only convex hulls
 
 Date: 2026-06-27
-Status: Accepted
+Status: Superseded by ADR-0014 (real ring assembly) — the convex hull is retained only as the
+per-relation fallback when ring assembly fails.
 
 ## Context
 

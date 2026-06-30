@@ -41,7 +41,7 @@ public sealed class OsmNormalizer
         var barrierWays = new List<(long id, string label, string cls, long[] nodes)>();
         var areaWays = new List<(long id, string kind, string name, long[] nodes)>();
         var wayNodes = new Dictionary<long, long[]>();
-        var areaRelations = new List<(long id, string kind, string name, long[] memberWays)>();
+        var areaRelations = new List<(long id, string kind, string name, (long id, string role)[] members)>();
         var titleNames = new List<string>();
 
         double minLon = double.MaxValue, minLat = double.MaxValue;
@@ -98,7 +98,8 @@ public sealed class OsmNormalizer
                     {
                         var members = rel.Members
                             .Where(m => m.Type == OsmGeoType.Way)
-                            .Select(m => m.Id).ToArray();
+                            .Select(m => (id: m.Id, role: m.Role ?? "")) // keep roles (ADR-0014)
+                            .ToArray();
                         if (members.Length > 0) areaRelations.Add((relId, rkind, rrname!, members));
                     }
                     break;
@@ -132,16 +133,45 @@ public sealed class OsmNormalizer
             if (ring is not null) features.Add(MakeArea("w" + id, kind, name, ring));
         }
 
-        foreach (var (id, kind, name, memberWays) in areaRelations)
+        foreach (var (id, kind, name, members) in areaRelations)
         {
-            var coords = new List<(double lon, double lat)>();
-            foreach (var wid in memberWays)
-                if (wayNodes.TryGetValue(wid, out var ns))
-                    foreach (var nid in ns)
-                        if (nodeCoords.TryGetValue(nid, out var c))
-                            coords.Add(c);
-            var ring = RelationGeometry.ConvexHullRing(coords);
-            if (ring is not null) features.Add(MakeArea("r" + id, kind, name, new[] { ring }));
+            // Real outer rings (ADR-0014): stitch outer/untagged member ways; drop inner holes.
+            var outerWays = new List<IReadOnlyList<(double lon, double lat)>>();
+            foreach (var (wid, role) in members)
+            {
+                if (role == "inner") continue;
+                if (!wayNodes.TryGetValue(wid, out var ns)) continue;
+                var seq = new List<(double lon, double lat)>(ns.Length);
+                foreach (var nid in ns)
+                    if (nodeCoords.TryGetValue(nid, out var c)) seq.Add(c);
+                if (seq.Count >= 2) outerWays.Add(seq);
+            }
+
+            var asm = RelationRings.Assemble(outerWays);
+            if (asm.Rings.Count > 0)
+            {
+                // Closed rings → real filled polygons.
+                for (int k = 0; k < asm.Rings.Count; k++)
+                    features.Add(MakeArea($"r{id}-{k}", kind, name, new[] { asm.Rings[k] }));
+            }
+            else if (asm.Lines.Count > 0)
+            {
+                // Bbox-clipped → draw the shoreline edge, not a false filled hull (ADR-0014).
+                for (int k = 0; k < asm.Lines.Count; k++)
+                    features.Add(MakeAreaLine($"r{id}-L{k}", kind, name, asm.Lines[k]));
+            }
+            else
+            {
+                // Total degeneracy (no usable geometry) → convex hull of member coords.
+                var coords = new List<(double lon, double lat)>();
+                foreach (var (wid, _) in members)
+                    if (wayNodes.TryGetValue(wid, out var ns))
+                        foreach (var nid in ns)
+                            if (nodeCoords.TryGetValue(nid, out var c))
+                                coords.Add(c);
+                var hull = RelationGeometry.ConvexHullRing(coords);
+                if (hull is not null) features.Add(MakeArea("r" + id, kind, name, new[] { hull }));
+            }
         }
 
         // Collapse co-located duplicates/fragments before ordering (ADR-0012).
@@ -272,6 +302,13 @@ public sealed class OsmNormalizer
     {
         Properties = new FeatureProperties { Kind = kind, Name = name, OsmId = osmId },
         Geometry = new ContractGeometry { Type = "Polygon", Coordinates = poly },
+    };
+
+    /// <summary>A water/park whose ring was clipped: emit the shoreline as a LineString (ADR-0014).</summary>
+    private static Feature MakeAreaLine(string osmId, string kind, string name, double[][] line) => new Feature
+    {
+        Properties = new FeatureProperties { Kind = kind, Name = name, OsmId = osmId },
+        Geometry = new ContractGeometry { Type = "LineString", Coordinates = line },
     };
 
     private const double SimplifyToleranceDeg = 0.000045; // ~5 m

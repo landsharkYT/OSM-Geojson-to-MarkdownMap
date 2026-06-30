@@ -33,7 +33,7 @@ public class NameResolverTests
     [Fact]
     public void Prefers_short_name_only_when_name_is_long()
     {
-        var longName = "a long institutional name"; // 38 chars
+        var longName = "Rivertown Society of the Western Hills"; // 38 chars (synthetic)
         Assert.Equal("Rivertown Society",
             NameResolver.Resolve(Tags(("name", longName), ("short_name", "Rivertown Society"))));
         // A short primary name wins over short_name.
