@@ -39,6 +39,34 @@ shops/civic rank above named buildings, which rank above minor/unnamed structure
 The ranking is a **tunable default, never hardcoded** — exposed as user settings after
 the first prototype.
 
+### Name resolution
+How a Feature gets its display name. The Normalizer (Stage 1, the only stage with raw OSM
+tags) resolves `name → brand → operator`, preferring `short_name` over a long `name`; a name
+derived from `brand`/`operator` counts as **named** for promotion and importance. A Feature
+the Normalizer still can't name is **unnamed**. Real name parsing can only live in the
+Normalizer — the Explorer/Generator never sees the raw tags. See ADR-0012.
+
+### Unnamed fallback
+The display label for an **unnamed** Feature: its humanized **category** subclass, lowercase
+(`place of worship`, not `unnamed`) — casing signals "type, not a proper name" to the LLM, and
+the redundant `(category)` is dropped on those lines. Render-only (needs only `category`), so
+it re-renders live and stays consistent with the SVG token labels. Distinct from
+[[name-resolution]], which runs in the Normalizer. See ADR-0012.
+
+### Co-location merge
+A Normalizer pass that collapses **duplicate/fragment** Features at the same place: an
+**unnamed** Feature within a small radius of a **named** one of compatible category folds into
+it; two Features with the **same name** within that radius collapse to one (prefer the
+point / higher importance). Targets the common OSM pattern where one place is mapped as both a
+node *and* a building way (and stray unnamed fragments around it). Conservative radius +
+same-category guard so distinct neighbours are never merged. See ADR-0012.
+
+### Unnamed promotion (tiered)
+Unnamed Features promote to their own Token only at **landmark tier**; unnamed
+destination/lower Features are demoted to a District's clustered count. A fixed default (not a
+toggle — it is model-affecting, unlike the render-only [[markdownmap-settings]]). Keeps the
+notable unnamed church while folding unnamed noise away. See ADR-0012.
+
 ### District (Cluster)
 A named group of lower-tier Features shown as a single block instead of individual
 Tokens, e.g. "Harborside (+38 minor buildings)". Keeps a whole-area
@@ -89,7 +117,44 @@ The browser-based helper app. Runs the pipeline **client-side** (.NET WASM, ADR-
 input never leaves the browser) and **visualizes the Generator's structure** — tokens,
 proximity edges, districts, terrain, crossing flags — at true geographic positions, beside
 the MarkdownMap it produces. A human-facing *true-geographic* view, complementing the
-LLM-facing *topological* MarkdownMap.
+LLM-facing *topological* MarkdownMap. The pipeline runs in a **persistent Web Worker** so the
+UI stays responsive and can show live progress during large imports (ADR-0010).
+
+### MarkdownMap settings
+The generation knobs that change the produced **MarkdownMap** (the copied artifact), exposed
+via a settings button on the MarkdownMap panel. v1 surfaces the three **render-only** knobs —
+`bidirectional` (each link under both features or once), `inlineNeighborName`, and
+`directivePreamble`. These change only the rendered markdown, never the **MapModel**, so a
+change re-renders the cached model instantly with no re-parse (ADR-0011). Live + persisted.
+**Distinct from [[layer toggles]]**, which only affect the SVG view. Model-affecting knobs
+(`neighborsPerFeature`, `buckets`) are deferred. Defaults are the documented ones
+(`docs/settings.md`); `bidirectional` stays **on** by default — the toggle exists for terser
+output when the consuming LLM is smart enough to infer the reverse direction.
+
+### Layer toggles
+Checkboxes (Terrain / Edges / Minor features / Tokens) that show or hide **SVG** map layers in
+the human-facing view. A display concern only — they do **not** affect the generated
+MarkdownMap. Live behind the [[map-view-settings]] button. Distinct from [[markdownmap-settings]].
+
+### Map view settings
+The Explorer's **display-only** settings (ADR-0013), behind a ⚙ button in the header — separate
+from [[markdownmap-settings]] (which change the generated text and run in WASM). Map view
+settings never touch the pipeline: [[layer-toggles]] plus **Approximate terrain** (default on —
+terrain drawn soft/faint as orientation context, honest about the convex-hull extent of
+ADR-0008). Persisted to localStorage; pure client-side SVG state.
+
+### Explorer legend
+The ⓘ popover in the header (ADR-0013) explaining the SVG symbology — crucially that the faint
+gray lines are **proximity links** ([[connection]]s), *not streets*, and that terrain areas are
+**approximate** extent, not precise shorelines. Addresses the two standing confusions of the
+schematic view.
+
+### Progress signal
+A structured event the pipeline emits at real seams (parse / build / serialize), carrying a
+**Phase** and optional **count** — never display text. The Explorer maps it to the rotating
+status line and the progress bar; the parse phase reports real stream byte-position so the
+bar is *determinate* through the segment where the time actually goes. UI-agnostic by design
+(the CLI ignores it), keeping the pipeline a reusable library. See ADR-0010.
 
 ### Normalizer (Stage 1)
 The OSM-aware front stage. Streams an OSM/XML extract and emits **GeoJSON**,

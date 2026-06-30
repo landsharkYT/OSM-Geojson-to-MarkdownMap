@@ -22,6 +22,12 @@ public sealed class MapGenerator
     /// <summary>The rendered MarkdownMap.</summary>
     public string Generate(FeatureCollection fc) => BuildModel(fc).Markdown;
 
+    /// <summary>
+    /// Re-render markdown from an existing model using this instance's options (ADR-0011).
+    /// The render-only settings change only text, never the model — so this never rebuilds.
+    /// </summary>
+    public string RenderModel(MapModel model) => Render(model);
+
     /// <summary>The structured model (incl. the rendered markdown). Used by the Explorer/WASM.</summary>
     public MapModel BuildModel(FeatureCollection fc)
     {
@@ -32,7 +38,15 @@ public sealed class MapGenerator
         bool hasDistricts = anchors.Count > 0;
 
         var pois = fc.Features.Where(f => f.Properties.Kind == "poi").ToList();
-        bool Promoted(Feature f) => !hasDistricts || f.Properties.Tier != "minor";
+        // Tiered unnamed promotion (ADR-0012): an unnamed feature earns its own token only at
+        // landmark tier; unnamed destination/lower features fold into a district's clustered count.
+        bool Promoted(Feature f)
+        {
+            if (!hasDistricts) return true;
+            if (f.Properties.Tier == "minor") return false;
+            bool named = !string.IsNullOrEmpty(f.Properties.Name);
+            return named || f.Properties.Tier == "landmark";
+        }
         var promotedF = pois.Where(Promoted)
             .OrderByDescending(f => f.Properties.Importance ?? 0)
             .ThenBy(f => f.Properties.OsmId, StringComparer.Ordinal)
@@ -230,7 +244,24 @@ public sealed class MapGenerator
     private static string Title(FeatureCollection fc) =>
         string.IsNullOrWhiteSpace(fc.Properties.Title) ? "Untitled area" : fc.Properties.Title;
 
-    private static string NameOf(FeatureProperties p) => string.IsNullOrEmpty(p.Name) ? "unnamed" : p.Name!;
+    private static string NameOf(FeatureProperties p) =>
+        !string.IsNullOrEmpty(p.Name) ? p.Name! : Humanize(p.Category);
+
+    /// <summary>
+    /// Fallback label for an unnamed feature (ADR-0012): its lowercase humanized category subclass
+    /// (`landmark.place_of_worship` → `place of worship`). Lowercase signals "type, not a proper
+    /// name" to the LLM. The redundant `(category)` is dropped on these lines (see AppendConnections).
+    /// </summary>
+    private static string Humanize(string? category)
+    {
+        if (string.IsNullOrEmpty(category)) return "unnamed";
+        int dot = category!.IndexOf('.');
+        var sub = dot < 0 ? category : category.Substring(dot + 1);
+        return sub.Replace('_', ' ');
+    }
+
+    private static bool IsCategoryFallbackName(string name, string category) =>
+        name == Humanize(category);
 
     private static void AppendPreamble(StringBuilder sb)
     {
@@ -305,6 +336,9 @@ public sealed class MapGenerator
         var byFrom = new Dictionary<string, List<Edge>>(StringComparer.Ordinal);
         foreach (var e in edges)
         {
+            // bidirectional=off: print each undirected pair once, under the lower (more-important)
+            // token. Tokens are equal-width zero-padded, so ordinal compare orders them (ADR-0011).
+            if (!_opts.Bidirectional && string.CompareOrdinal(e.FromToken, e.ToToken) > 0) continue;
             if (!byFrom.TryGetValue(e.FromToken, out var list)) byFrom[e.FromToken] = list = new List<Edge>();
             list.Add(e);
         }
@@ -313,7 +347,9 @@ public sealed class MapGenerator
         for (int i = 0; i < features.Count; i++)
         {
             var f = features[i];
-            sb.Append(f.Token).Append(' ').Append(f.Name).Append(" (").Append(f.Category).Append(')');
+            sb.Append(f.Token).Append(' ').Append(f.Name);
+            // Drop the redundant "(category)" when the name *is* the humanized category (ADR-0012).
+            if (!IsCategoryFallbackName(f.Name, f.Category)) sb.Append(" (").Append(f.Category).Append(')');
             if (f.Street is not null) sb.Append(f.StreetApprox ? " · near " : " · on ").Append(f.Street);
             if (f.District is not null) sb.Append(" · ").Append(f.District);
             sb.Append('\n');

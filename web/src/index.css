@@ -1,6 +1,29 @@
 @import 'tailwindcss';
 
+/* Opt every surface (incl. native form controls + scrollbars) into the
+   active scheme so checkboxes/scrollbars aren't stuck in light mode. */
+:root {
+  color-scheme: light dark;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
+}
+
+/* Base page background so there's never a white flash behind the app shell. */
+body {
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #020617; /* slate-950 */
+  }
+}
+
+/* Indeterminate progress bar (ProgressCard, used while the runtime loads). */
+@keyframes mdmap-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
 }

@@ -28,7 +28,10 @@ public sealed class OsmNormalizer
         return Normalize(stream);
     }
 
-    public FeatureCollection Normalize(Stream osmStream)
+    /// <summary>Emit a parse tick at most every this many elements (keeps the callback cheap).</summary>
+    private const int ProgressEveryElements = 4096;
+
+    public FeatureCollection Normalize(Stream osmStream, BuildProgress? progress = null)
     {
         var nodeCoords = new Dictionary<long, (double lon, double lat)>();
         var poiNodes = new List<(long id, Dictionary<string, string> tags, double lon, double lat)>();
@@ -45,8 +48,18 @@ public sealed class OsmNormalizer
         double maxLon = double.MinValue, maxLat = double.MinValue;
 
         var source = new XmlOsmStreamSource(osmStream);
+        bool canReportBytes = progress is not null && osmStream.CanSeek;
+        int sinceTick = 0;
         foreach (var element in source)
         {
+            // Byte-position ticks during the long pole (ADR-0010). Position advances in
+            // reader-buffer chunks but is monotonic — enough to drive a determinate bar.
+            if (progress is not null && ++sinceTick >= ProgressEveryElements)
+            {
+                sinceTick = 0;
+                if (canReportBytes) progress(BuildPhase.Parsing, osmStream.Position);
+            }
+
             switch (element)
             {
                 case Node n when n.Id is long nid && n.Longitude is double lon && n.Latitude is double lat:
@@ -131,6 +144,9 @@ public sealed class OsmNormalizer
             if (ring is not null) features.Add(MakeArea("r" + id, kind, name, new[] { ring }));
         }
 
+        // Collapse co-located duplicates/fragments before ordering (ADR-0012).
+        features = MergeCoLocatedPois(features);
+
         // Deterministic ordering for stable diffs.
         features.Sort((a, b) => string.CompareOrdinal(a.Properties.OsmId, b.Properties.OsmId));
 
@@ -148,12 +164,80 @@ public sealed class OsmNormalizer
         };
     }
 
+    private const double MergeRadiusMeters = 40.0;
+
+    /// <summary>
+    /// Collapse co-located duplicate/fragment POIs (ADR-0012). Within <see cref="MergeRadiusMeters"/>
+    /// and the same category class: an unnamed POI folds into a named one; two same-name POIs
+    /// collapse to one. Survivor preference: named first, then higher importance, then stable id.
+    /// </summary>
+    private static List<Feature> MergeCoLocatedPois(List<Feature> features)
+    {
+        var pois = features.Where(f => f.Properties.Kind == "poi").ToList();
+        if (pois.Count < 2) return features;
+        var result = features.Where(f => f.Properties.Kind != "poi").ToList();
+
+        var ordered = pois
+            .OrderBy(f => string.IsNullOrEmpty(f.Properties.Name) ? 1 : 0)
+            .ThenByDescending(f => f.Properties.Importance ?? 0)
+            .ThenBy(f => f.Properties.OsmId, StringComparer.Ordinal)
+            .ToList();
+
+        var kept = new List<Feature>();
+        foreach (var f in ordered)
+        {
+            bool folds = false;
+            foreach (var k in kept)
+            {
+                if (!SameClass(k.Properties.Category, f.Properties.Category)) continue;
+                if (DistanceMeters(k, f) > MergeRadiusMeters) continue;
+                bool sameName = !string.IsNullOrEmpty(f.Properties.Name)
+                    && string.Equals(f.Properties.Name, k.Properties.Name, StringComparison.Ordinal);
+                bool unnamedIntoNamed = string.IsNullOrEmpty(f.Properties.Name)
+                    && !string.IsNullOrEmpty(k.Properties.Name);
+                if (sameName || unnamedIntoNamed) { folds = true; break; }
+            }
+            if (!folds) kept.Add(f);
+        }
+        result.AddRange(kept);
+        return result;
+    }
+
+    private static bool SameClass(string? a, string? b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+        return ClassOf(a!) == ClassOf(b!);
+    }
+
+    private static string ClassOf(string category)
+    {
+        int dot = category.IndexOf('.');
+        return dot < 0 ? category : category.Substring(0, dot);
+    }
+
+    private static double DistanceMeters(Feature a, Feature b)
+    {
+        var (alon, alat) = PointOf(a);
+        var (blon, blat) = PointOf(b);
+        const double R = 6371000.0, D = Math.PI / 180.0;
+        double dLat = (blat - alat) * D, dLon = (blon - alon) * D;
+        double h = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+            + Math.Cos(alat * D) * Math.Cos(blat * D) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return 2 * R * Math.Asin(Math.Min(1.0, Math.Sqrt(h)));
+    }
+
+    private static (double lon, double lat) PointOf(Feature f)
+    {
+        var c = (double[])f.Geometry.Coordinates; // POIs are freshly-built Points
+        return (c[0], c[1]);
+    }
+
     private static Feature MakePoi(
         string osmId, IReadOnlyDictionary<string, string> tags, double lon, double lat,
         IReadOnlyList<Road> roads)
     {
         var c = Classifier.Classify(tags)!;
-        tags.TryGetValue("name", out var name);
+        var name = NameResolver.Resolve(tags); // name → brand → operator (ADR-0012)
         var (street, approx) = StreetSnapper.Assign(tags, (lon, lat), roads, StreetSnapRadiusMeters);
         return new Feature
         {

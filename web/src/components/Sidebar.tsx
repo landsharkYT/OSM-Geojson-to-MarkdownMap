@@ -1,22 +1,17 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { MapModel } from '../types'
-import type { Layers } from './MapView'
+import type { MarkdownMapSettings } from '../settings'
+import { SettingsPopover } from './SettingsPopover'
 
 interface Props {
   model: MapModel
   selected: string | null
-  layers: Layers
-  onLayersChange: (l: Layers) => void
+  settings: MarkdownMapSettings
+  onSettingsChange: (s: MarkdownMapSettings) => void
 }
 
-const LAYER_LABELS: Record<keyof Layers, string> = {
-  terrain: 'Terrain',
-  edges: 'Edges',
-  minors: 'Minor features',
-  tokens: 'Tokens',
-}
-
-export function Sidebar({ model, selected, layers, onLayersChange }: Props) {
+export function Sidebar({ model, selected, settings, onSettingsChange }: Props) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const feature = useMemo(
     () => model.features.find((f) => f.token === selected) ?? null,
     [model, selected],
@@ -37,20 +32,7 @@ export function Sidebar({ model, selected, layers, onLayersChange }: Props) {
   }
 
   return (
-    <aside className="flex h-full w-[26rem] shrink-0 flex-col border-l border-slate-200 dark:border-slate-700">
-      {/* layers */}
-      <div className="flex flex-wrap gap-3 border-b border-slate-200 p-3 text-sm dark:border-slate-700">
-        {(Object.keys(LAYER_LABELS) as (keyof Layers)[]).map((k) => (
-          <label key={k} className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={layers[k]}
-              onChange={(e) => onLayersChange({ ...layers, [k]: e.target.checked })}
-            />
-            {LAYER_LABELS[k]}
-          </label>
-        ))}
-      </div>
+    <aside className="flex h-full w-[26rem] shrink-0 flex-col border-l border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
 
       {/* details */}
       <div className="border-b border-slate-200 p-3 text-sm dark:border-slate-700">
@@ -87,9 +69,20 @@ export function Sidebar({ model, selected, layers, onLayersChange }: Props) {
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
           <span className="text-sm font-medium">MarkdownMap</span>
-          <div className="flex gap-2 text-xs">
+          <div className="relative flex gap-2 text-xs">
+            <button
+              onClick={() => setSettingsOpen((o) => !o)}
+              aria-label="MarkdownMap settings"
+              aria-expanded={settingsOpen}
+              className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+            >
+              ⚙
+            </button>
             <button onClick={copy} className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Copy</button>
             <button onClick={download} className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Download</button>
+            {settingsOpen && (
+              <SettingsPopover settings={settings} onChange={onSettingsChange} onClose={() => setSettingsOpen(false)} />
+            )}
           </div>
         </div>
         <pre className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3 font-mono text-xs whitespace-pre-wrap dark:bg-slate-900">

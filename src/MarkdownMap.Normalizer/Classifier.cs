@@ -60,7 +60,8 @@ public static class Classifier
 
     public static Classification? Classify(IReadOnlyDictionary<string, string> tags)
     {
-        bool hasName = tags.ContainsKey("name");
+        // A name resolved from name/brand/operator (ADR-0012) counts as named for scoring.
+        bool hasName = NameResolver.Resolve(tags) is not null;
         string? Tag(string k) => tags.TryGetValue(k, out var v) ? v : null;
 
         var amenity = Tag("amenity");

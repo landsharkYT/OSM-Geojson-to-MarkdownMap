@@ -3,22 +3,20 @@ import { select } from 'd3-selection'
 import { zoom, zoomIdentity, type ZoomTransform } from 'd3-zoom'
 import type { MapModel, PromotedFeature } from '../types'
 import { computeBounds, makeProjection } from '../projection'
+import { visibleLabels, type LabelCandidate } from '../labelLayout'
+import type { Layers } from '../mapViewSettings'
 
 const W = 1000
 const H = 750
 
-export interface Layers {
-  terrain: boolean
-  edges: boolean
-  minors: boolean
-  tokens: boolean
-}
+export type { Layers }
 
 interface Props {
   model: MapModel
   selected: string | null
   onSelect: (token: string | null) => void
   layers: Layers
+  approximateTerrain: boolean
 }
 
 /** Deterministic district colour (stable hue from the name). */
@@ -29,7 +27,16 @@ function districtColor(name: string | undefined): string {
   return `hsl(${h} 70% 55%)`
 }
 
-export function MapView({ model, selected, onSelect, layers }: Props) {
+function terrainStyle(kind: string, approximate: boolean) {
+  const water = kind === 'water'
+  const base = water ? '56,189,248' : '34,197,94'
+  const stroke = water ? '#0ea5e9' : '#22c55e'
+  return approximate
+    ? { fill: `rgba(${base},0.12)`, stroke, strokeOpacity: 0.5, dash: '4 4' }
+    : { fill: `rgba(${base},${water ? 0.3 : 0.22})`, stroke, strokeOpacity: 1, dash: undefined }
+}
+
+export function MapView({ model, selected, onSelect, layers, approximateTerrain }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [t, setT] = useState<ZoomTransform>(zoomIdentity)
 
@@ -50,7 +57,16 @@ export function MapView({ model, selected, onSelect, layers }: Props) {
     return () => { sel.on('.zoom', null) }
   }, [])
 
-  // De-duplicate the bidirectional edges for drawing.
+  // Projected base positions (viewBox units, pre-zoom) for promoted features.
+  const placed = useMemo(
+    () => model.features.map((f) => {
+      const [px, py] = proj.project(f.lon, f.lat)
+      return { f, px, py }
+    }),
+    [model, proj],
+  )
+
+  // De-duplicate bidirectional edges; keep only those between two promoted features.
   const drawEdges = useMemo(() => {
     const seen = new Set<string>()
     return model.edges.filter((e) => {
@@ -61,7 +77,24 @@ export function MapView({ model, selected, onSelect, layers }: Props) {
     })
   }, [model, byToken])
 
-  const pt = (lon: number, lat: number) => proj.project(lon, lat).join(',')
+  // Symbols are fixed screen-size, positioned by applying the zoom transform to coordinates —
+  // so zooming spreads clusters apart instead of magnifying the dots (ADR-0013).
+  const sx = (px: number) => px * t.k + t.x
+  const sy = (py: number) => py * t.k + t.y
+
+  // Which labels fit at the current zoom (collision-avoided, importance-first; pan-invariant
+  // so it only recomputes when k or selection changes).
+  const shownLabels = useMemo(() => {
+    if (!layers.tokens) return new Set<string>()
+    const cands: LabelCandidate[] = placed.map(({ f, px, py }) => ({
+      token: f.token, x: px * t.k, y: py * t.k, importance: f.importance,
+    }))
+    return visibleLabels(cands, { force: selected })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placed, t.k, selected, layers.tokens])
+
+  const isActive = (e: { fromToken: string; toToken: string }) =>
+    selected != null && (e.fromToken === selected || e.toToken === selected)
 
   return (
     <svg
@@ -70,53 +103,72 @@ export function MapView({ model, selected, onSelect, layers }: Props) {
       className="h-full w-full bg-slate-50 dark:bg-slate-900"
       onClick={() => onSelect(null)}
     >
+      {/* --- geometry layer: scales with zoom --- */}
       <g transform={`translate(${t.x},${t.y}) scale(${t.k})`}>
-        {/* terrain (back) */}
         {layers.terrain &&
           model.terrain.flatMap((te, i) =>
             te.parts.map((part, j) => {
-              const points = part.map(([lon, lat]) => pt(lon, lat)).join(' ')
+              const points = part.map(([lon, lat]) => proj.project(lon, lat).join(',')).join(' ')
               if (te.kind === 'barrier')
                 return (
                   <polyline key={`t${i}-${j}`} points={points} fill="none"
                     stroke="#ef4444" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />
                 )
-              const fill = te.kind === 'water' ? 'rgba(56,189,248,0.30)' : 'rgba(34,197,94,0.22)'
-              const stroke = te.kind === 'water' ? '#0ea5e9' : '#22c55e'
+              const s = terrainStyle(te.kind, approximateTerrain)
               return (
-                <polygon key={`t${i}-${j}`} points={points} fill={fill} stroke={stroke}
-                  strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                <polygon key={`t${i}-${j}`} points={points} fill={s.fill} stroke={s.stroke}
+                  strokeOpacity={s.strokeOpacity} strokeDasharray={s.dash} strokeWidth={1}
+                  vectorEffect="non-scaling-stroke" />
               )
             }),
           )}
 
-        {/* proximity edges */}
+        {/* proximity links — faint background structure; the selected feature's brighten */}
         {layers.edges &&
           drawEdges.map((e, i) => {
             const a = byToken.get(e.fromToken)!
             const b = byToken.get(e.toToken)!
             const [x1, y1] = proj.project(a.lon, a.lat)
             const [x2, y2] = proj.project(b.lon, b.lat)
+            const active = isActive(e)
             return (
               <line key={`e${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke={e.crosses ? '#ef4444' : '#cbd5e1'}
-                strokeWidth={e.crosses ? 1.5 : 1}
-                strokeDasharray={e.crosses ? '4 3' : undefined}
+                stroke={active ? '#38bdf8' : '#94a3b8'}
+                strokeOpacity={active ? 0.9 : 0.2}
+                strokeWidth={active ? 1.5 : 1}
                 vectorEffect="non-scaling-stroke" />
             )
           })}
+      </g>
 
-        {/* minor features */}
+      {/* --- symbol layer: constant screen size, positioned by the transform --- */}
+      <g>
         {layers.minors &&
           model.minors.map((f, i) => {
-            const [x, y] = proj.project(f.lon, f.lat)
-            return <circle key={`m${i}`} cx={x} cy={y} r={2} fill="#94a3b8" opacity={0.5} />
+            const [px, py] = proj.project(f.lon, f.lat)
+            return <circle key={`m${i}`} cx={sx(px)} cy={sy(py)} r={2} fill="#94a3b8" opacity={0.5} />
           })}
 
-        {/* promoted tokens */}
+        {/* crossing markers: a red ✕ on the selected feature's links that cross a barrier
+            (distinct from a barrier, which is a red dashed line) */}
+        {layers.edges && selected != null &&
+          drawEdges
+            .filter((e) => isActive(e) && e.crosses)
+            .map((e, i) => {
+              const a = byToken.get(e.fromToken)!
+              const b = byToken.get(e.toToken)!
+              const [ax, ay] = proj.project(a.lon, a.lat)
+              const [bx, by] = proj.project(b.lon, b.lat)
+              return (
+                <text key={`x${i}`} x={sx((ax + bx) / 2)} y={sy((ay + by) / 2)}
+                  fontSize={13} fill="#ef4444" textAnchor="middle" dominantBaseline="central"
+                  style={{ pointerEvents: 'none' }}>✕</text>
+              )
+            })}
+
         {layers.tokens &&
-          model.features.map((f) => {
-            const [x, y] = proj.project(f.lon, f.lat)
+          placed.map(({ f, px, py }) => {
+            const x = sx(px), y = sy(py)
             const isSel = f.token === selected
             return (
               <g key={f.token} className="cursor-pointer"
@@ -124,12 +176,13 @@ export function MapView({ model, selected, onSelect, layers }: Props) {
                 onMouseEnter={() => onSelect(f.token)}>
                 <circle cx={x} cy={y} r={isSel ? 6 : 4}
                   fill={districtColor(f.district)}
-                  stroke={isSel ? '#111827' : '#fff'} strokeWidth={isSel ? 2 : 1}
-                  vectorEffect="non-scaling-stroke" />
-                <text x={x + 6} y={y + 3} fontSize={9} fill="#475569"
-                  className="select-none dark:fill-slate-300" style={{ pointerEvents: 'none' }}>
-                  {f.token}
-                </text>
+                  stroke={isSel ? '#0ea5e9' : '#fff'} strokeWidth={isSel ? 2.5 : 1} />
+                {(isSel || shownLabels.has(f.token)) && (
+                  <text x={x + 6} y={y + 3} fontSize={9} fill="#475569"
+                    className="select-none dark:fill-slate-300" style={{ pointerEvents: 'none' }}>
+                    {f.token}
+                  </text>
+                )}
               </g>
             )
           })}

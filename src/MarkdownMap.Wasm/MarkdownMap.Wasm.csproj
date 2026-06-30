@@ -13,6 +13,15 @@
          (e.g. MapModel.Minors / MinorFeature). -->
     <TrimmerRootAssembly Include="MarkdownMap.Generator" />
     <TrimmerRootAssembly Include="MarkdownMap.Contract" />
+    <!-- Bridge holds STJ DTOs ((de)serialized by reflection): the options DTO and the error
+         result. Without rooting, the trimmer strips their members and STJ silently emits
+         empty JSON — masking the real error as "{}". -->
+    <TrimmerRootAssembly Include="MarkdownMap.Bridge" />
+    <!-- OsmSharp parses .osm XML via System.Xml.Serialization.XmlSerializer, which reads
+         its model types (Osm/Node/Way/Relation/Tag) reflectively. Without rooting, the
+         trimmer strips those members and the parse silently yields zero elements (no
+         exception) — the .osm import comes back empty. -->
+    <TrimmerRootAssembly Include="OsmSharp" />
   </ItemGroup>
 
   <ItemGroup>

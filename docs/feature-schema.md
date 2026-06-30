@@ -24,7 +24,7 @@ A single `FeatureCollection`:
 | field | type | notes |
 |---|---|---|
 | `kind` | enum | `poi` \| `road` \| `barrier` \| `water` \| `park` \| `place` |
-| `name` | string \| null | normalized; null = unnamed |
+| `name` | string \| null | resolved `name → brand → operator`, `short_name` preferred when `name` is long (ADR-0012); null = unnamed (rendered as a humanized category label) |
 | `osmId` | string | provenance, e.g. `n29445653`, `w12345` (Stage 2 ignores for ranking) |
 | `category` | string | normalized class.subclass (see §4); poi/place only |
 | `importance` | int 0–100 | computed score (see §5); poi only |
@@ -77,7 +77,7 @@ Top-level class drives base importance. Subclass = the OSM value (passed through
 ```
 base   = { landmark:80, destination:55, minor:30 }[classBaseTier]
 score  = base
-       + (name != null      ? 10 : 0)
+       + (resolvedName != null ? 10 : 0)  // name|brand|operator (ADR-0012)
        + (class==landmark    ?  5 : 0)
        - (isChainNoise        ?  5 : 0)   // e.g. generic fast_food; optional
 score  = clamp(score, 0, 100)
@@ -92,16 +92,21 @@ Render policy (also tunable, see settings):
 - `landmark` + `destination` → **Promoted** (own token).
 - `minor` → **Clustered** by default; promoted only where a District is sparse.
 - `structure` → count only.
+- **Tiered unnamed promotion (ADR-0012):** a feature still **unnamed** after resolution is
+  promoted only at `landmark` tier; unnamed `destination`/lower features are demoted to the
+  District clustered count, so nameless noise never gets its own token.
 
 ## 6. Polygon → point, de-duplication, street snap
 
 - **Representative point** (ways): polygon **centroid**; if the centroid lies outside the
   polygon, fall back to pole-of-inaccessibility (label point). v1 may ship centroid-only
   and upgrade later.
-- **De-duplication:** if a `poi` node lies **inside** (or within ~5 m of) a building
-  polygon that is itself a poi/named, **merge** into one Feature — prefer the node's
-  name/category, keep the node's point. Prevents two tokens for one place (a common
-  amenity-tagged-on-building case).
+- **Co-location merge (ADR-0012):** after features are built, collapse co-located
+  duplicates/fragments within **~40 m** of the same **category class**: an **unnamed** poi
+  folds into a **named** one; two **same-name** pois collapse to one (survivor preference:
+  named, then higher importance, then stable id). This catches the common case of one place
+  mapped as both an `amenity` node *and* a `building` way, plus stray unnamed fragments around
+  it. The radius + same-class guard keep distinct neighbours from being merged.
 - **Street snap:** `street = addr:street` if present; else nearest `road` LineString
   within ~30 m → set `streetApprox=true`. Beyond that, `street=null`.
 
