@@ -120,6 +120,56 @@ test('rendered preview toggle formats the markdown (display-only, no rebuild)', 
   await expect(page.getByText('Generating map', { exact: true })).toBeHidden()
 })
 
+test('chunking splits the map into scene-chunks, navigable via the manifest and the map', async ({ page }) => {
+  await page.goto('/')
+  await page.setInputFiles('input[type="file"]', fixture)
+  await expect(page.locator('main svg').getByText('[01]', { exact: true })).toBeVisible()
+
+  // Turn on scene-chunks in MarkdownMap settings, then close the popover.
+  await page.getByRole('button', { name: 'MarkdownMap settings' }).click()
+  await page.locator('label', { hasText: 'Scene-chunks' }).locator('input').check()
+  await page.keyboard.press('Escape')
+
+  // No rebuild — the worker re-renders the cached model in place.
+  await expect(page.getByText('Generating map', { exact: true })).toBeHidden()
+
+  // Home view is the manifest menu: interactive chunk rows, not a raw document.
+  await expect(page.getByText(/Manifest of \d+ chunks/)).toBeVisible()
+  const firstRow = page.locator('aside ul button').first()
+  await expect(firstRow).toBeVisible()
+
+  // Hovering a manifest row spotlights that chunk on the map (amber halo on its nodes).
+  const halo = page.locator('svg circle[stroke="#f59e0b"]')
+  await firstRow.hover()
+  await expect(halo.first()).toBeVisible()
+
+  // Clicking a manifest row opens that chunk's self-contained page, with concrete ways out —
+  // and the map highlight persists while the chunk is open.
+  await firstRow.click()
+  const pre = page.locator('pre')
+  await expect(pre).toContainText('# SCENE-CHUNK —')
+  await expect(pre).toContainText('## Ways out')
+  await expect(halo.first()).toBeVisible()
+
+  // A per-chunk download button is offered only while a chunk is open.
+  await expect(page.getByRole('button', { name: 'Download chunk' })).toBeVisible()
+
+  // The back button returns to the manifest menu and clears the highlight.
+  await page.getByRole('button', { name: '← Chunks' }).click()
+  await expect(page.getByText(/Manifest of \d+ chunks/)).toBeVisible()
+  await expect(halo).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Download chunk' })).toBeHidden()
+
+  // Clicking a map node opens its chunk too (the map is a live index of the same chunks).
+  await page.locator('svg g.cursor-pointer circle').first().click()
+  await expect(pre).toContainText('# SCENE-CHUNK —')
+
+  // Turning it back off restores the single whole-area document (live, no rebuild).
+  await page.getByRole('button', { name: 'MarkdownMap settings' }).click()
+  await page.locator('label', { hasText: 'Scene-chunks' }).locator('input').uncheck()
+  await expect(page.locator('pre')).toContainText('# MARKDOWNMAP')
+})
+
 test('the sidebar can be resized by dragging its left edge', async ({ page }) => {
   await page.goto('/')
   await page.setInputFiles('input[type="file"]', fixture)

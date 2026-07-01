@@ -30,7 +30,10 @@ Lives alongside the schematic, e.g. `[42]: Old Town Library`.
 ### Connection
 A link drawn between two Features on the schematic. Annotated with a **standardized
 distance** and a **bearing** (compass direction), since the layout itself is not to
-scale.
+scale. The rendered line carries **rounded metres + bearing only**; the coarse size bucket
+(adjacent / near / short walk / far) is **derivable from the metres** and is dropped from the
+markdown text (it survives in the [[explorer-react-helper|Explorer]] detail view), keeping the
+densest section terse.
 
 ### Importance Tier
 A rank assigned to each Feature that decides whether it is **Promoted** (shown as its
@@ -76,17 +79,29 @@ Riverside ...) as district anchors: each Feature joins its nearest anchor
 (Voronoi). Geometric-cluster fallback only where no place coverage exists.
 
 ### Scope (v1)
-A single MarkdownMap renders the **entire ingested OSM extract**. Scene-radius /
-focal-anchor chunking is a deferred later feature, not part of v1. Chunking is not just
-a smaller map — it **reinterprets** the document: it carries an intrinsic **Anchor** and
-**Off-map edges**, and its Directive Preamble reframes the map as "immediate
-surroundings" rather than "the world". See ADR-0005.
+By default a single MarkdownMap renders the **entire ingested OSM extract**. [[chunking]]
+(ADR-0016) is the opt-in alternative: it **reinterprets** the document into self-contained
+scene-chunks, each carrying an intrinsic **[[anchor]]** and **[[off-map-edge|off-map edges]]**,
+with a Directive Preamble that reframes the map as "immediate surroundings" rather than "the
+world". See ADR-0005 (the reserved render-mode seam) and ADR-0016.
 
 ### Directive Preamble
-An optional, clearly-delimited block at the top of a MarkdownMap that instructs the
-consuming LLM (treat as authoritative geography, how to read a Connection line, where the
-Anchor is). Toggleable and **mode-aware** — kept separate from the map data so it never
-pollutes non-LLM consumers. See ADR-0005.
+An optional, clearly-delimited block that gives the consuming LLM **behavioral** instruction:
+treat the map as authoritative / canon, don't invent geography not listed, and (in a
+[[chunking|chunk]]) reach other areas only via [[off-map-edge|off-map edges]]. Toggleable
+([[markdownmap-settings]], default on) and **mode-aware**, compressed to a dense line or two.
+**Distinct from the [[reading-key]]** — the toggle removes the *instruction*, never the parse
+legend, so a chunk stays self-contained with the preamble off. See ADR-0005.
+
+### Reading key
+The compact, **always-present** legend at the top of every MarkdownMap and every
+[[chunking|chunk]] explaining how to *parse* a line — the `[token] Name (category)` header, the
+`→ ~<m>m <DIR>` [[connection]] form (N = up, 8-wind), the [[barrier-crossing-flag|crosses]] /
+[[separation-flag|separated by water]] / [[stands-apart]] flags, and "not to scale". Kept to a
+couple of dense lines and **not a toggle**: it is what makes a chunk **self-contained** (a
+retriever may load one chunk with no [[manifest]]), so it stays even when the
+[[directive-preamble]] is off. Distinct from the Directive Preamble (behavioral instruction, not a
+legend).
 
 ### Transit (deferred)
 Public-transport features. OSM carries them richly (named bus stops by cross-street,
@@ -96,14 +111,39 @@ are ordered **relations** needing the same topology preservation the Normalizer 
 deliberately. Routes are the *long-range, cross-District* connective tissue the proximity
 graph cannot express, and make travel time **mode-dependent** (walk vs bus vs rail).
 
-### Anchor (deferred)
-"You are here." The focal Feature a scene-chunk map is built around. Intrinsic to
-chunked maps; absent (or user-stated) in whole-area maps.
+### Anchor
+The focal Feature a [[chunking|chunk]] is oriented on — its **key feature** (the District's spine head).
+Fixed per chunk, giving a static chunk set; the party's *exact* spot is the consumer's to
+narrate. Intrinsic to chunked maps; absent (or user-stated) in whole-area maps. See ADR-0016.
 
-### Off-map edge (deferred)
-A marker on a scene-chunk map's boundary pointing toward what continues beyond it
-(e.g. "→ N: toward Harborside, off-map"), so the LLM does not treat the map edge as the
-edge of the world.
+### Off-map edge
+A concrete exit on a [[chunking|chunk]]'s boundary pointing toward the neighbour that continues beyond it:
+neighbour name + bearing + the specific boundary Feature just across + distance (e.g.
+"→ NE toward Harborside (off-map): via [42] Dock Gate, ~120m"), so the LLM never treats the chunk
+edge as the edge of the world. Derived by aggregating boundary-crossing [[connection|connections]]
+per neighbour chunk. See ADR-0016.
+
+### Chunking
+An opt-in [[markdownmap-settings|generation setting]] (ADR-0016) that renders the map as a set of
+self-contained **scene-chunks** instead of one document, for a storytelling LLM that loads **one
+chunk at a time** (retrieval) — sharp local focus, cheap per turn. A **chunk** = a
+[[district-cluster|District]] (spine-split into contiguous segments when it exceeds the
+[[scene-size]] target), oriented on its [[anchor]], carrying a compact reading key, local terrain,
+its features + connections, and concrete [[off-map-edge|off-map exits]]. Tokens are **global and
+stable** across all chunks so references stay coherent as the party moves. Render-only over the
+MapModel (no re-parse, ADR-0011), but the output shape becomes a chunk set + [[manifest]]. Distinct
+from whole-area mode (the default). See ADR-0016.
+
+### Manifest
+The index emitted alongside a [[chunking|chunked]] map: one row per chunk — name · file · bbox ·
+[[anchor]] · neighbours — so a retrieval system can pick *which chunk the party is in* without
+reading them all. Shipped as `manifest.md` in the download zip. See ADR-0016.
+
+### Scene size
+The [[chunking]] control: **Tight / Standard / Wide** (≈ 8 / 14 / 22 promoted Features per
+chunk, Standard default). Sets the target a District may reach before it spine-splits — i.e. how
+much world a single scene shows. Measured in promoted Features (clustered minors are cheap). See
+ADR-0016.
 
 ### Source (acquisition)
 Where raw map data comes from: a **static OSM export file** (`.osm`/`.pbf`) the user
@@ -122,14 +162,15 @@ UI stays responsive and can show live progress during large imports (ADR-0010).
 
 ### MarkdownMap settings
 The generation knobs that change the produced **MarkdownMap** (the copied artifact), exposed
-via a settings button on the MarkdownMap panel. v1 surfaces the three **render-only** knobs —
-`bidirectional` (each link under both features or once), `inlineNeighborName`, and
-`directivePreamble`. These change only the rendered markdown, never the **MapModel**, so a
-change re-renders the cached model instantly with no re-parse (ADR-0011). Live + persisted.
-**Distinct from [[layer toggles]]**, which only affect the SVG view. Model-affecting knobs
-(`neighborsPerFeature`, `buckets`) are deferred. Defaults are the documented ones
-(`docs/settings.md`); `bidirectional` stays **on** by default — the toggle exists for terser
-output when the consuming LLM is smart enough to infer the reverse direction.
+via a settings button on the MarkdownMap panel. v1 surfaces the **render-only** knobs —
+`bidirectional` (each link under both features or once), `inlineNeighborName`,
+`directivePreamble` (the behavioral [[directive-preamble]] only — the [[reading-key]] is always
+emitted, never a knob), plus [[chunking]] + [[scene-size]]. These change only the rendered
+markdown, never the **MapModel**, so a change re-renders the cached model instantly with no
+re-parse (ADR-0011). Live + persisted. **Distinct from [[layer toggles]]**, which only affect the
+SVG view. Model-affecting knobs (`neighborsPerFeature`, `buckets`) are deferred. `bidirectional`
+now defaults **off** (each link once; the reverse direction is inferable) — the terser default,
+since the redundant both-ways listing is the single largest cost in the connections block.
 
 ### Rendered preview
 A **display-only** sidebar toggle (default **off**) that shows the MarkdownMap as formatted
@@ -179,6 +220,10 @@ the hard boundary between the two stages.
 ### Street (attribute)
 The named road a Feature sits on, carried as a property (`addr:street` tag, else
 nearest-named-road snap). v1 ships street *labels*, not street *routing* — see ADR-0003.
+On the rendered map a Feature shows its street **only when it differs from its area's dominant
+street** — the dominant one is named once (the [[district-cluster|District]] header + [[spine]] in
+whole-area, a compact note in a [[chunking|chunk]]) and the redundant per-Feature repeat is
+dropped. Off-street features (a different road) still carry their own label.
 
 ### Barrier / crossing flag
 A `[crosses <barrier>]` flag on a Connection whose straight-line segment intersects a

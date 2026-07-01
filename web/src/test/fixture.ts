@@ -22,4 +22,6 @@ export const rivertown: MapModel = {
     { name: 'Mill Lake', kind: 'water', kindLabel: 'water', note: 'open water', position: 'W', geometryType: 'Polygon', parts: [[[-120.5007, 45.5199], [-120.5004, 45.5199], [-120.5004, 45.5205], [-120.5007, 45.5205], [-120.5007, 45.5199]]] },
   ],
   markdown: '# MARKDOWNMAP — Old Town, Rivertown\n\n## Connections\n\n```\n[01] Founders Mural (landmark.artwork)\n```\n',
+  chunks: [],
+  manifest: '',
 }

@@ -9,6 +9,20 @@ export interface MapModel {
   districts: District[]
   terrain: TerrainEntry[]
   markdown: string
+  // Scene-chunks (ADR-0016): empty unless the Chunking setting is on.
+  chunks: Chunk[]
+  manifest: string
+}
+
+export interface Chunk {
+  name: string
+  slug: string
+  anchorToken: string
+  anchorName: string
+  bounds: number[] // local [minLon, minLat, maxLon, maxLat]
+  tokens: string[]
+  neighbours: string[]
+  markdown: string
 }
 
 export interface PromotedFeature {

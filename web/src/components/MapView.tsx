@@ -18,7 +18,12 @@ interface Props {
   onSelect: (token: string | null) => void
   layers: Layers
   detailedTerrain: boolean
+  // Scene-chunk highlight (ADR-0016): tokens of the active/hovered chunk. When set, those nodes
+  // get a halo and everything else dims, so the chunk reads as a region on the map.
+  highlight?: string[] | null
 }
+
+const highlightColor = '#f59e0b' // amber halo — distinct from selection blue and district hues
 
 /** Deterministic district colour (stable hue from the name). */
 function districtColor(name: string | undefined): string {
@@ -43,9 +48,14 @@ function hullAreaStyle(kind: string) {
   return { fill: water ? 'rgba(56,189,248,0.12)' : 'rgba(34,197,94,0.10)', stroke: terrainStroke(kind) }
 }
 
-export function MapView({ model, selected, onSelect, layers, detailedTerrain }: Props) {
+export function MapView({ model, selected, onSelect, layers, detailedTerrain, highlight }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [t, setT] = useState<ZoomTransform>(zoomIdentity)
+
+  const highlightSet = useMemo(
+    () => (highlight && highlight.length ? new Set(highlight) : null),
+    [highlight],
+  )
 
   const proj = useMemo(() => makeProjection(computeBounds(model), W, H), [model])
   const byToken = useMemo(() => {
@@ -158,10 +168,13 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain }: 
             const [x1, y1] = proj.project(a.lon, a.lat)
             const [x2, y2] = proj.project(b.lon, b.lat)
             const active = isActive(e)
+            // When a chunk is highlighted, only its internal links keep their weight; the rest fade.
+            const inChunk = highlightSet == null || (highlightSet.has(e.fromToken) && highlightSet.has(e.toToken))
+            const opacity = active ? 0.9 : inChunk ? 0.2 : 0.04
             return (
               <line key={`e${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
                 stroke={active ? '#38bdf8' : '#94a3b8'}
-                strokeOpacity={active ? 0.9 : 0.2}
+                strokeOpacity={opacity}
                 strokeWidth={active ? 1.5 : 1}
                 vectorEffect="non-scaling-stroke" />
             )
@@ -173,7 +186,7 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain }: 
         {layers.minors &&
           model.minors.map((f, i) => {
             const [px, py] = proj.project(f.lon, f.lat)
-            return <circle key={`m${i}`} cx={sx(px)} cy={sy(py)} r={2} fill="#94a3b8" opacity={0.5} />
+            return <circle key={`m${i}`} cx={sx(px)} cy={sy(py)} r={2} fill="#94a3b8" opacity={highlightSet ? 0.15 : 0.5} />
           })}
 
         {/* crossing markers: a red ✕ on the selected feature's links that cross a barrier
@@ -197,14 +210,19 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain }: 
           placed.map(({ f, px, py }) => {
             const x = sx(px), y = sy(py)
             const isSel = f.token === selected
+            const isHi = highlightSet?.has(f.token) ?? false
+            const faded = highlightSet != null && !isHi
             return (
-              <g key={f.token} className="cursor-pointer"
+              <g key={f.token} className="cursor-pointer" opacity={faded ? 0.2 : 1}
                 onClick={(ev) => { ev.stopPropagation(); onSelect(f.token) }}
                 onMouseEnter={() => onSelect(f.token)}>
+                {isHi && (
+                  <circle cx={x} cy={y} r={9} fill="none" stroke={highlightColor} strokeWidth={2} strokeOpacity={0.9} />
+                )}
                 <circle cx={x} cy={y} r={isSel ? 6 : 4}
                   fill={districtColor(f.district)}
                   stroke={isSel ? '#0ea5e9' : '#fff'} strokeWidth={isSel ? 2.5 : 1} />
-                {(isSel || shownLabels.has(f.token)) && (
+                {(isSel || isHi || shownLabels.has(f.token)) && (
                   <text x={x + 6} y={y + 3} fontSize={9} fill="#475569"
                     className="select-none dark:fill-slate-300" style={{ pointerEvents: 'none' }}>
                     {f.token}

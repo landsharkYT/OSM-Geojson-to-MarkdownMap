@@ -42,7 +42,7 @@ public class MapGeneratorTests
     {
         var md = Generate();
         Assert.Contains("<!-- DIRECTIVE PREAMBLE", md);
-        Assert.Contains("## How to read this map", md);
+        Assert.Contains("## How to read", md);
         Assert.Contains("**Bounds:**", md);
         Assert.Contains("## Terrain & barriers", md); // fixture has water/park/barrier
         Assert.Contains("## Districts", md);          // fixture has place anchors
@@ -62,17 +62,21 @@ public class MapGeneratorTests
     public void Edges_crossing_a_barrier_are_flagged()
     {
         var md = Generate();
-        // Riverside School (E of Route 9) ↔ the Main Street strip (W) must cross.
+        // Riverside School (E of Route 9) ↔ the Main Street strip (W) must cross. With bidirectional
+        // off the pair prints once under the lower token; metres + bearing only (no size bucket).
         Assert.Contains("[crosses Route 9]", md);
-        Assert.Matches(@"→ \[04\] Riverside School — ~\d+m \w+, \w+ \[crosses Route 9\]", md);
+        Assert.Matches(@"→ \[\d+\] [^\n]*— ~\d+m \w+ \[crosses Route 9\]", md);
     }
 
     [Fact]
-    public void Connection_headers_carry_street_and_district()
+    public void Connection_headers_hoist_the_dominant_street_and_keep_exceptions()
     {
         var md = Generate();
-        Assert.Contains("[01] Founders Mural (landmark.artwork) · on Main Street · Old Town", md);
-        Assert.Contains("· near 10th Street · Harborside", md); // streetApprox → "near"
+        // [01] sits on Main Street (Old Town's dominant, named at the district/spine) → street dropped.
+        Assert.Contains("[01] Founders Mural (landmark.artwork) · Old Town", md);
+        Assert.DoesNotContain("[01] Founders Mural (landmark.artwork) · on Main Street", md);
+        // Riverside School is off the dominant street → it keeps its own (streetApprox → "near").
+        Assert.Contains("· near 10th Street · Harborside", md);
     }
 
     [Fact]

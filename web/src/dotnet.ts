@@ -10,7 +10,7 @@ export type ProgressFn = (phase: Phase, value: number) => void
 
 type Job =
   | { kind: 'build'; resolve: (r: BuildResult) => void; reject: (e: Error) => void; onProgress?: ProgressFn }
-  | { kind: 'rerender'; resolve: (markdown: string) => void; reject: (e: Error) => void }
+  | { kind: 'rerender'; resolve: (r: BuildResult) => void; reject: (e: Error) => void }
 
 let worker: Worker | null = null
 let nextId = 1
@@ -30,7 +30,7 @@ function ensureWorker(): Worker {
       job.resolve(normalize(JSON.parse(msg.json) as BuildResult))
     } else if (msg.type === 'rerendered' && job.kind === 'rerender') {
       pending.delete(msg.id)
-      job.resolve(msg.markdown)
+      job.resolve(normalize(JSON.parse(msg.json) as BuildResult))
     } else if (msg.type === 'fail') {
       pending.delete(msg.id)
       job.reject(new Error(msg.message))
@@ -54,6 +54,8 @@ function normalize(r: BuildResult): BuildResult {
   r.districts ??= []
   r.terrain ??= []
   r.bounds ??= []
+  r.chunks ??= []
+  r.manifest ??= ''
   return r
 }
 
@@ -85,11 +87,11 @@ export function buildFromGeoJson(
   return build({ kind: 'geojson', text: geojson }, settings, onProgress)
 }
 
-/** Re-render the cached model with new settings (ADR-0011). Resolves to fresh markdown. */
-export function rerender(settings: MarkdownMapSettings): Promise<string> {
+/** Re-render the cached model with new settings (ADR-0011). Resolves to the refreshed model. */
+export function rerender(settings: MarkdownMapSettings): Promise<BuildResult> {
   const w = ensureWorker()
   const id = nextId++
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<BuildResult>((resolve, reject) => {
     pending.set(id, { kind: 'rerender', resolve, reject })
     const req: Request = { type: 'rerender', id, runtimeUrl: runtimeUrl(), options: JSON.stringify(settings) }
     w.postMessage(req)

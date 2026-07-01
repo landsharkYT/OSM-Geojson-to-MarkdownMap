@@ -21,6 +21,32 @@ public sealed class MapModel
 
     /// <summary>The rendered MarkdownMap (byte-identical to the Generator's string output).</summary>
     public string Markdown { get; set; } = "";
+
+    /// <summary>
+    /// Scene-chunks (ADR-0016). Empty unless the Chunking option is on. Each is a self-contained
+    /// document over a District (or spine segment); the whole-area <see cref="Markdown"/> stays
+    /// populated regardless, so chunking is purely additive output.
+    /// </summary>
+    public List<Chunk> Chunks { get; set; } = new();
+
+    /// <summary>Index document for <see cref="Chunks"/> (ADR-0016). Empty unless chunking is on.</summary>
+    public string Manifest { get; set; } = "";
+}
+
+/// <summary>
+/// A self-contained scene-chunk (ADR-0016): one District or spine segment, rendered with its own
+/// reading key, local terrain, intra-chunk connections, and concrete off-map exits.
+/// </summary>
+public sealed class Chunk
+{
+    public string Name { get; set; } = "";        // "Old Town · N"
+    public string Slug { get; set; } = "";         // file stem, e.g. "old-town-n"
+    public string AnchorToken { get; set; } = "";  // the chunk's key (highest-importance) feature
+    public string AnchorName { get; set; } = "";
+    public double[] Bounds { get; set; } = new double[0]; // local [minLon, minLat, maxLon, maxLat]
+    public List<string> Tokens { get; set; } = new();     // promoted tokens inside this chunk
+    public List<string> Neighbours { get; set; } = new(); // adjacent chunk names (off-map exits)
+    public string Markdown { get; set; } = "";
 }
 
 /// <summary>A tokenized, graphed feature.</summary>

@@ -49,11 +49,11 @@ self.addEventListener('message', async (e: MessageEvent<Request>) => {
 
     if (msg.type === 'rerender') {
       if (lastModelJson === null) throw new Error('no map to re-render')
+      // Render returns the refreshed MapModel JSON, or {"error":...} JSON on failure (ADR-0016).
       const out = api.Render(lastModelJson, msg.options)
-      // Render returns markdown, or {"error":...} JSON on failure (markdown is never JSON).
       const err = tryParseError(out)
       if (err) post({ type: 'fail', id: msg.id, message: err })
-      else post({ type: 'rerendered', id: msg.id, markdown: out })
+      else { lastModelJson = out; post({ type: 'rerendered', id: msg.id, json: out }) }
       return
     }
 

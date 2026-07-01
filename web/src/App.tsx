@@ -14,6 +14,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [highlight, setHighlight] = useState<string[] | null>(null)
   const [mapView, setMapView] = useState<MapViewSettings>(loadMapView)
   const [settings, setSettings] = useState<MarkdownMapSettings>(loadSettings)
   const [display, setDisplay] = useState<MarkdownDisplaySettings>(loadDisplay)
@@ -64,14 +65,16 @@ export default function App() {
   }
 
   // A settings change is render-only (ADR-0011): persist it and re-render the cached model
-  // in-place — no re-parse, no progress bar.
+  // in-place — no re-parse, no progress bar. The refreshed model carries new markdown and, when
+  // chunking is on, the scene-chunk set + manifest (ADR-0016).
   async function changeSettings(next: MarkdownMapSettings) {
     setSettings(next)
     saveSettings(next)
     if (!model) return
     try {
-      const markdown = await rerender(next)
-      setModel((m) => (m ? { ...m, markdown } : m))
+      const result = await rerender(next)
+      if (isError(result)) setError(result.error)
+      else setModel(result)
     } catch (e) {
       setError(String(e))
     }
@@ -150,6 +153,7 @@ export default function App() {
                 onSelect={setSelected}
                 layers={mapView.layers}
                 detailedTerrain={mapView.detailedTerrain}
+                highlight={highlight}
               />
             </div>
             <Sidebar
@@ -159,6 +163,8 @@ export default function App() {
               onSettingsChange={changeSettings}
               display={display}
               onDisplayChange={changeDisplay}
+              onClearSelection={() => setSelected(null)}
+              onHighlight={setHighlight}
             />
             {/* Re-import over an existing map: dimmed overlay keeps context. */}
             {progress && (

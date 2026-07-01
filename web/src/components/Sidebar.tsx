@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { zipSync, strToU8 } from 'fflate'
 import type { MapModel } from '../types'
 import type { MarkdownDisplaySettings, MarkdownMapSettings } from '../settings'
 import { renderMarkdown } from '../markdown'
 import { SettingsPopover } from './SettingsPopover'
+import { ChunkList } from './ChunkList'
 
 interface Props {
   model: MapModel
@@ -11,6 +13,9 @@ interface Props {
   onSettingsChange: (s: MarkdownMapSettings) => void
   display: MarkdownDisplaySettings
   onDisplayChange: (d: MarkdownDisplaySettings) => void
+  onClearSelection: () => void
+  // Report the chunk to spotlight on the map (hovered manifest row, else the open chunk).
+  onHighlight: (tokens: string[] | null) => void
 }
 
 // Drag-to-resize bounds. Max is also clamped to the live window so the map keeps room.
@@ -27,8 +32,10 @@ function loadWidth(): number {
   return DEFAULT_WIDTH
 }
 
-export function Sidebar({ model, selected, settings, onSettingsChange, display, onDisplayChange }: Props) {
+export function Sidebar({ model, selected, settings, onSettingsChange, display, onDisplayChange, onClearSelection, onHighlight }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [openSlug, setOpenSlug] = useState<string | null>(null)
+  const [hoverSlug, setHoverSlug] = useState<string | null>(null)
   const [width, setWidth] = useState<number>(loadWidth)
   const widthRef = useRef(width)
   widthRef.current = width
@@ -74,20 +81,59 @@ export function Sidebar({ model, selected, settings, onSettingsChange, display, 
     () => (selected ? model.edges.filter((e) => e.fromToken === selected) : []),
     [model, selected],
   )
+
+  // Scene-chunks (ADR-0016): when on, the panel opens a single chunk two ways — hovering/clicking a
+  // map node (via `selected`), or clicking a row in the manifest menu (`openSlug`). Node selection
+  // wins so the map stays a live index; the manifest menu is the "home" view. Copy/Download act on
+  // whatever is shown. Off → the whole-area document.
+  const chunked = model.chunks.length > 0
+  const activeChunk = useMemo(() => {
+    if (!chunked) return null
+    const bySelection = selected ? model.chunks.find((c) => c.tokens.includes(selected)) : undefined
+    return bySelection ?? (openSlug ? model.chunks.find((c) => c.slug === openSlug) : undefined) ?? null
+  }, [chunked, selected, openSlug, model.chunks])
+  const activeMarkdown = chunked ? (activeChunk?.markdown ?? model.manifest) : model.markdown
+
+  // Clear hoverSlug too: clicking a row unmounts the list before its mouseleave can fire.
+  const openChunk = (slug: string) => { onClearSelection(); setHoverSlug(null); setOpenSlug(slug) }
+  const backToManifest = () => { onClearSelection(); setHoverSlug(null); setOpenSlug(null) }
+
+  // Spotlight the hovered manifest row if any, otherwise the open chunk, on the map.
+  const highlightTokens = useMemo(() => {
+    if (!chunked) return null
+    const hovered = hoverSlug ? model.chunks.find((c) => c.slug === hoverSlug) : undefined
+    return (hovered ?? activeChunk)?.tokens ?? null
+  }, [chunked, hoverSlug, activeChunk, model.chunks])
+  useEffect(() => { onHighlight(highlightTokens) }, [highlightTokens, onHighlight])
+
   // Only parse+sanitize when the rendered preview is actually shown.
   const renderedHtml = useMemo(
-    () => (display.rendered ? renderMarkdown(model.markdown) : ''),
-    [display.rendered, model.markdown],
+    () => (display.rendered ? renderMarkdown(activeMarkdown) : ''),
+    [display.rendered, activeMarkdown],
   )
 
-  const copy = () => navigator.clipboard?.writeText(model.markdown)
-  const download = () => {
-    const blob = new Blob([model.markdown], { type: 'text/markdown' })
+  const copy = () => navigator.clipboard?.writeText(activeMarkdown)
+
+  function saveBlob(blob: Blob, filename: string) {
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = 'map.md'
+    a.download = filename
     a.click()
     URL.revokeObjectURL(a.href)
+  }
+  const download = () => {
+    if (chunked) {
+      // Zip the manifest + one file per chunk — a drop-in for a retrieval store (ADR-0016).
+      const files: Record<string, Uint8Array> = { 'manifest.md': strToU8(model.manifest) }
+      for (const c of model.chunks) files[`${c.slug}.md`] = strToU8(c.markdown)
+      saveBlob(new Blob([zipSync(files)], { type: 'application/zip' }), 'scene-chunks.zip')
+    } else {
+      saveBlob(new Blob([model.markdown], { type: 'text/markdown' }), 'map.md')
+    }
+  }
+  // Just the open chunk, as its own file (ADR-0016).
+  const downloadChunk = () => {
+    if (activeChunk) saveBlob(new Blob([activeChunk.markdown], { type: 'text/markdown' }), `${activeChunk.slug}.md`)
   }
 
   return (
@@ -140,7 +186,7 @@ export function Sidebar({ model, selected, settings, onSettingsChange, display, 
       {/* markdown */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-          <span className="text-sm font-medium">MarkdownMap</span>
+          <span className="text-sm font-medium">{chunked ? 'Scene-chunks' : 'MarkdownMap'}</span>
           <div className="relative flex gap-2 text-xs">
             <button
               onClick={() => setSettingsOpen((o) => !o)}
@@ -150,8 +196,11 @@ export function Sidebar({ model, selected, settings, onSettingsChange, display, 
             >
               ⚙
             </button>
-            <button onClick={copy} className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Copy</button>
-            <button onClick={download} className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Download</button>
+            <button onClick={copy} title={chunked ? 'Copy this chunk' : 'Copy the markdown'} className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Copy</button>
+            {activeChunk && (
+              <button onClick={downloadChunk} title={`Download just this chunk (${activeChunk.slug}.md)`} className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Download chunk</button>
+            )}
+            <button onClick={download} title={chunked ? 'Download a zip of all chunks + manifest' : 'Download the markdown'} className="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">{chunked ? 'Download all' : 'Download'}</button>
             {settingsOpen && (
               <SettingsPopover
                 settings={settings}
@@ -163,14 +212,33 @@ export function Sidebar({ model, selected, settings, onSettingsChange, display, 
             )}
           </div>
         </div>
-        {display.rendered ? (
+        {chunked && (
+          <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+            {activeChunk ? (
+              <>
+                <button
+                  onClick={backToManifest}
+                  className="rounded bg-slate-200 px-1.5 py-0.5 font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                >
+                  ← Chunks
+                </button>
+                <span className="truncate"><span className="font-medium text-slate-700 dark:text-slate-200">{activeChunk.name}</span> · {activeChunk.neighbours.length > 0 ? `exits: ${activeChunk.neighbours.join(', ')}` : 'self-contained'}</span>
+              </>
+            ) : (
+              <>Manifest of {model.chunks.length} chunks — open one below, or click a map node.</>
+            )}
+          </div>
+        )}
+        {chunked && !activeChunk ? (
+          <ChunkList chunks={model.chunks} onOpen={openChunk} onHover={setHoverSlug} />
+        ) : display.rendered ? (
           <div
             className="markdown-body min-h-0 flex-1 overflow-auto bg-slate-50 p-3 text-sm dark:bg-slate-900"
             dangerouslySetInnerHTML={{ __html: renderedHtml }}
           />
         ) : (
           <pre className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3 font-mono text-xs whitespace-pre-wrap dark:bg-slate-900">
-            {model.markdown}
+            {activeMarkdown}
           </pre>
         )}
       </div>

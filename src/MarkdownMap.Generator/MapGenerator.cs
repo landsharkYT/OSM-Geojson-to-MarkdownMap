@@ -28,6 +28,19 @@ public sealed class MapGenerator
     /// </summary>
     public string RenderModel(MapModel model) => Render(model);
 
+    /// <summary>
+    /// Refresh every rendered view on the model from this instance's options (ADR-0011): the
+    /// whole-area markdown, and — when Chunking is on — the scene-chunk set + manifest (ADR-0016).
+    /// Reasons only over already-built data, so it never re-parses. Returns the same instance.
+    /// </summary>
+    public MapModel Compose(MapModel model)
+    {
+        model.Markdown = Render(model);
+        if (_opts.Chunking) Chunker.Apply(model, _opts);
+        else { model.Chunks = new List<Chunk>(); model.Manifest = ""; }
+        return model;
+    }
+
     /// <summary>The structured model (incl. the rendered markdown). Used by the Explorer/WASM.</summary>
     public MapModel BuildModel(FeatureCollection fc)
     {
@@ -146,8 +159,7 @@ public sealed class MapGenerator
             Districts = BuildDistricts(promotedF, points, district, minorF, anchors, Token),
             Terrain = BuildTerrain(fc, fc.Properties.Bounds),
         };
-        model.Markdown = Render(model);
-        return model;
+        return Compose(model);
     }
 
     private List<District> BuildDistricts(
@@ -255,7 +267,7 @@ public sealed class MapGenerator
         AppendBounds(sb, m.Bounds);
         AppendTerrain(sb, m.Terrain);
         if (m.Districts.Count > 0) AppendDistricts(sb, m.Districts);
-        AppendConnections(sb, m.Features, m.Edges);
+        AppendConnections(sb, m.Features, m.Edges, m.Districts);
         return sb.ToString();
     }
 
@@ -278,38 +290,41 @@ public sealed class MapGenerator
         return sub.Replace('_', ' ');
     }
 
-    private static bool IsCategoryFallbackName(string name, string category) =>
+    internal static bool IsCategoryFallbackName(string name, string category) =>
         name == Humanize(category);
 
+    // True when the feature sits on its district's dominant street (already named once at the
+    // district/spine level), so the per-feature repeat can be dropped (grill 2026-06-30).
+    private static bool IsDominantStreet(PromotedFeature f, Dictionary<string, string?> domStreet) =>
+        f.District is not null
+        && domStreet.TryGetValue(f.District, out var dom)
+        && dom is not null
+        && string.Equals(f.Street, dom, StringComparison.Ordinal);
+
+    // The behavioral directive (toggleable). Compressed to two dense lines (grill 2026-06-30):
+    // instruction only — the always-on reading key (AppendHowToRead) carries the parse legend.
     private static void AppendPreamble(StringBuilder sb)
     {
         sb.Append("<!-- DIRECTIVE PREAMBLE · mode=whole-area -->\n\n");
-        sb.Append("**TO THE ASSISTANT — READ FIRST.** The document below is the **authoritative map** of\n");
-        sb.Append("this world. Every position, distance, and direction is canon. **Do not invent\n");
-        sb.Append("geography or places that are not listed here.** When a scene involves *where* something\n");
-        sb.Append("is or *how far*, consult this map and reason from it. If something is not on the map, it\n");
-        sb.Append("is unknown — say so rather than guessing.\n\n");
+        sb.Append("**Authoritative map — treat as canon.** Do not invent geography or places not listed\n");
+        sb.Append("here; if something is not on the map, it is unknown — say so rather than guessing.\n\n");
         sb.Append("<!-- /DIRECTIVE PREAMBLE -->\n\n");
     }
 
+    // The reading key: always emitted (self-containment), compressed to a few dense lines.
     private static void AppendHowToRead(StringBuilder sb, bool hasDistricts, bool hasTerrain)
     {
-        sb.Append("## How to read this map\n\n");
-        sb.Append("- **Feature header** = `[token] Name (category)`");
-        sb.Append(hasDistricts ? ", optionally `· on <street> · <district>`.\n" : ".\n");
-        sb.Append("- **Connection** = `→ [token] Name — ~<metres>m <DIR>, <size>`, read as: from the current\n");
-        sb.Append("  feature, the named one lies `<metres>` away in compass direction `<DIR>` (N = north/up;\n");
-        sb.Append("  8-wind: N NE E SE S SW W NW). `<size>`: **adjacent** <25 m · **near** <150 m ·\n");
-        sb.Append("  **short walk** <500 m · **far** ≥500 m.\n");
+        sb.Append("## How to read\n\n");
+        sb.Append("- `[token] Name (category)`");
+        sb.Append(hasDistricts ? " optionally `· on <street> · <district>`.\n" : ".\n");
+        sb.Append("- `→ [token] Name — ~<m>m <DIR>`: the named feature lies ~<m> metres away, compass\n");
+        sb.Append("  `<DIR>` (N = up; 8-wind). Straight-line closeness, **not to scale** — only the numbers\n");
+        sb.Append("  and letters are real.\n");
         if (hasTerrain)
-        {
-            sb.Append("- A `[crosses <road>]` flag means a road or rail line lies between the two features —\n  passable at a crossing, but **not** a clean walkable hop.\n");
-            sb.Append("- A `[separated by water]` flag means open water (lake, river, or canal) lies between them:\n  the distance is real but you cannot walk it directly. A feature marked `stands apart` is\n  reached only across water. **Terrain & barriers** lists water, parks, and barriers with\n  their rough position for orientation.\n");
-        }
+            sb.Append("- Flags: `[crosses <road>]` a road/rail lies between (cross at a crossing); `[separated by\n  water]` open water lies between (not directly walkable); `stands apart` reached only across water.\n");
         if (hasDistricts)
-            sb.Append("- **Districts** group features; `spine:` lists them in order along the district's axis;\n  `clustered:` counts minor features not shown individually.\n");
-        sb.Append("- Layout is **not to scale** — only the numbers and compass letters are real. Neighbours\n");
-        sb.Append("  are straight-line closeness, not road distance.\n\n");
+            sb.Append("- `spine:` orders a district along its axis; `clustered:` counts minor features not listed.\n");
+        sb.Append('\n');
     }
 
     private static void AppendBounds(StringBuilder sb, double[] b)
@@ -352,8 +367,13 @@ public sealed class MapGenerator
         }
     }
 
-    private void AppendConnections(StringBuilder sb, List<PromotedFeature> features, List<Edge> edges)
+    private void AppendConnections(StringBuilder sb, List<PromotedFeature> features, List<Edge> edges, List<District> districts)
     {
+        // Street hoist (grill 2026-06-30): the District header + spine already name the dominant
+        // street, so a feature drops its own `· on <street>` when it matches — off-street features keep it.
+        var domStreet = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var d in districts) domStreet[d.Name] = d.Street;
+
         var byFrom = new Dictionary<string, List<Edge>>(StringComparer.Ordinal);
         foreach (var e in edges)
         {
@@ -384,7 +404,8 @@ public sealed class MapGenerator
             sb.Append(f.Token).Append(' ').Append(f.Name);
             // Drop the redundant "(category)" when the name *is* the humanized category (ADR-0012).
             if (!IsCategoryFallbackName(f.Name, f.Category)) sb.Append(" (").Append(f.Category).Append(')');
-            if (f.Street is not null) sb.Append(f.StreetApprox ? " · near " : " · on ").Append(f.Street);
+            if (f.Street is not null && !IsDominantStreet(f, domStreet))
+                sb.Append(f.StreetApprox ? " · near " : " · on ").Append(f.Street);
             if (f.District is not null) sb.Append(" · ").Append(f.District);
             if (StandsApart(f.Token)) sb.Append(" · stands apart — reached only across water");
             sb.Append('\n');
@@ -394,8 +415,9 @@ public sealed class MapGenerator
                 {
                     sb.Append("   → ").Append(e.ToToken);
                     if (_opts.InlineNeighborName) sb.Append(' ').Append(e.ToName);
+                    // Metres + bearing only; the size bucket is derivable and dropped (grill 2026-06-30).
                     sb.Append(" — ~").Append(e.Meters.ToString(CultureInfo.InvariantCulture)).Append("m ")
-                      .Append(e.Dir).Append(", ").Append(e.Bucket);
+                      .Append(e.Dir);
                     if (e.SeparatedByWater) sb.Append(" [separated by water]");
                     if (e.Crosses is not null) sb.Append(" [crosses ").Append(e.Crosses).Append(']');
                     sb.Append('\n');

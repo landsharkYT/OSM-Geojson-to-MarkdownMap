@@ -1,16 +1,23 @@
 // MarkdownMap generation settings (ADR-0011) — the three render-only knobs surfaced by the
 // settings button. Distinct from the SVG layer toggles. Keys mirror the C# options DTO
 // (camelCase), so JSON.stringify(settings) is the optionsJson passed to WASM.
+export type SceneSize = 'tight' | 'standard' | 'wide'
+
 export interface MarkdownMapSettings {
   bidirectional: boolean
   inlineNeighborName: boolean
   directivePreamble: boolean
+  // Scene-chunk retrieval (ADR-0016): split the map into self-contained per-area chunks.
+  chunking: boolean
+  sceneSize: SceneSize
 }
 
 export const DEFAULT_SETTINGS: MarkdownMapSettings = {
-  bidirectional: true,
+  bidirectional: false,
   inlineNeighborName: true,
   directivePreamble: true,
+  chunking: false,
+  sceneSize: 'standard',
 }
 
 const KEY = 'mdmap.settings'

@@ -47,8 +47,9 @@ public static class MapBuilder
     }
 
     /// <summary>
-    /// Re-render the MarkdownMap from an existing model with new options (ADR-0011) — no rebuild.
-    /// Returns markdown, or <c>{"error":"..."}</c> JSON on failure (markdown is never JSON).
+    /// Re-render every view of an existing model with new options (ADR-0011) — no rebuild. Returns
+    /// the refreshed MapModel JSON (whole-area markdown plus scene-chunks/manifest when Chunking is
+    /// on, ADR-0016), or <c>{"error":"..."}</c> JSON on failure.
     /// </summary>
     public static string RenderFromModel(string mapModelJson, string? optionsJson = null)
     {
@@ -56,7 +57,8 @@ public static class MapBuilder
         {
             var model = JsonSerializer.Deserialize<MapModel>(mapModelJson, Options)
                         ?? throw new ArgumentException("could not parse MapModel");
-            return new MapGenerator(ParseOptions(optionsJson)).RenderModel(model);
+            new MapGenerator(ParseOptions(optionsJson)).Compose(model);
+            return JsonSerializer.Serialize(model, Options);
         }
         catch (Exception ex) { return Error(ex); }
     }
@@ -79,6 +81,8 @@ public static class MapBuilder
         if (dto.Bidirectional is bool b) o.Bidirectional = b;
         if (dto.InlineNeighborName is bool i) o.InlineNeighborName = i;
         if (dto.DirectivePreamble is bool d) o.DirectivePreamble = d;
+        if (dto.Chunking is bool ch) o.Chunking = ch;
+        if (dto.SceneSize is string s) o.SceneSize = GeneratorOptions.SceneSizeFor(s);
         return o;
     }
 
@@ -87,6 +91,8 @@ public static class MapBuilder
         public bool? Bidirectional { get; set; }
         public bool? InlineNeighborName { get; set; }
         public bool? DirectivePreamble { get; set; }
+        public bool? Chunking { get; set; }
+        public string? SceneSize { get; set; }
     }
 
     private static string Error(Exception ex) =>

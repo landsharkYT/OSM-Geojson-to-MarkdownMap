@@ -17,9 +17,10 @@ export type Request =
   // Re-render the worker's cached model with new settings (ADR-0011) — no rebuild.
   | { type: 'rerender'; id: number; runtimeUrl: string; options: string }
 
-// worker → main
+// worker → main. A re-render returns the full refreshed MapModel JSON (whole-area markdown plus
+// scene-chunks/manifest when Chunking is on, ADR-0016) — not a bare markdown string.
 export type Response =
   | { type: 'progress'; id: number; phase: Phase; value: number }
   | { type: 'done'; id: number; json: string }
-  | { type: 'rerendered'; id: number; markdown: string }
+  | { type: 'rerendered'; id: number; json: string }
   | { type: 'fail'; id: number; message: string }
