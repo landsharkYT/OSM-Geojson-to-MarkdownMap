@@ -24,10 +24,22 @@ public class PromotionTests
     [InlineData("food.cafe", "budgeted")]
     [InlineData("shop.clothes", "budgeted")]
     [InlineData("leisure.marina", "core")]
+    [InlineData("leisure.stadium", "core")]
     [InlineData("leisure.fitness_centre", "budgeted")]
+    [InlineData("leisure.swimming_pool", "budgeted")] // facility, not a major venue (ADR-0018)
+    [InlineData("leisure.ice_rink", "budgeted")]
     [InlineData("residential.apartments", "clustered")]
     public void Salience_classifies_by_category(string category, string expected) =>
         Assert.Equal(expected, SalienceClassifier.Of(category));
+
+    [Theory]
+    [InlineData("landmark.place_of_worship", true)]
+    [InlineData("landmark.church", true)]
+    [InlineData("landmark.museum", false)]
+    [InlineData("leisure.swimming_pool", false)]
+    [InlineData("civic.school", false)]
+    public void IsWorship_only_true_for_worship(string category, bool expected) =>
+        Assert.Equal(expected, SalienceClassifier.IsWorship(category));
 
     private static Feature Poi(string name, string category, int importance, double lon, double lat, string? salience = null) => new Feature
     {
@@ -68,7 +80,7 @@ public class PromotionTests
     }
 
     [Fact]
-    public void Unnamed_non_core_clusters_but_unnamed_core_promotes()
+    public void Unnamed_clusters_unless_worship()
     {
         var fc = new FeatureCollection
         {
@@ -77,14 +89,16 @@ public class PromotionTests
             {
                 Place("Downtown", 0, 0),
                 Poi("Named Cafe", "food.cafe", 65, 0.001, 0.0),
-                Poi(null!, "civic.school", 90, 0.0011, 0.0),   // unnamed core → promotes
-                Poi(null!, "food.cafe", 60, 0.0012, 0.0),       // unnamed budgeted → clusters (ADR-0012)
+                Poi(null!, "landmark.place_of_worship", 90, 0.0011, 0.0), // unnamed worship → promotes
+                Poi(null!, "civic.school", 90, 0.0012, 0.0),              // unnamed non-worship core → clusters
+                Poi(null!, "food.cafe", 60, 0.0013, 0.0),                 // unnamed budgeted → clusters
             },
         };
 
         var m = new MapGenerator().BuildModel(fc);
-        Assert.Contains(m.Features, f => f.Category == "civic.school");    // unnamed core promoted
-        Assert.Equal(1, m.Features.Count(f => f.Category == "food.cafe")); // only the named cafe promoted
-        Assert.Equal(1, m.Minors.Count(f => f.Category == "food.cafe"));   // the unnamed cafe clustered
+        Assert.Contains(m.Features, f => f.Category == "landmark.place_of_worship"); // the church promotes unnamed
+        Assert.DoesNotContain(m.Features, f => f.Category == "civic.school");        // unnamed non-worship clusters now
+        Assert.Equal(1, m.Features.Count(f => f.Category == "food.cafe"));           // only the named cafe promoted
+        Assert.Equal(2, m.Minors.Count);                                            // unnamed school + unnamed cafe
     }
 }

@@ -37,6 +37,11 @@ token only at **landmark tier**; unnamed destination/lower Features are demoted 
 District's clustered count. Fixed default, not a toggle — it is model-affecting, unlike the
 render-only settings (ADR-0011).
 
+> **Refined (2026-07-01):** tightened to its intent — an unnamed Feature promotes **only if it is
+> worship** (the "the church" case above); every other unnamed Feature clusters, since real extracts
+> promoted piles of nameless `swimming pool` / `maritime` category-label tokens. See CONTEXT →
+> *Unnamed promotion (worship-only)*.
+
 **Unnamed fallback label (Generator, render-only).** Whatever remains unnamed renders as its
 humanized **category** subclass, lowercase (`place of worship`), with the redundant
 `(category)` suppressed on those lines. Needs only `category`, so it re-renders live and keeps

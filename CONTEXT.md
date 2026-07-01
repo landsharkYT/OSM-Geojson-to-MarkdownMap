@@ -93,13 +93,15 @@ point / higher importance). Targets the common OSM pattern where one place is ma
 node *and* a building way (and stray unnamed fragments around it). Conservative radius +
 same-category guard so distinct neighbours are never merged. See ADR-0012.
 
-### Unnamed promotion (tiered)
-Unnamed Features promote to their own Token only at **landmark tier**; unnamed
-destination/lower Features are demoted to a District's clustered count. A fixed default (not a
-toggle — it is model-affecting, unlike the render-only [[markdownmap-settings]]). Keeps the
-notable unnamed church while folding unnamed noise away. Composes with [[narrative-salience]]: an
-unnamed non-core Feature has low [[importance-tier|importance]], so it rarely wins the
-[[promotion-budget]] and clusters anyway. See ADR-0012 and ADR-0018.
+### Unnamed promotion (worship-only)
+An unnamed Feature earns its own [[token]] **only if it is worship** (the canonical "the church"
+case) — every other unnamed Feature folds into a District's clustered count, whatever its
+[[narrative-salience]]. Rationale: an unnamed thing is a weak scene anchor (no name to reference),
+and a worship site is the one category singular and evocative enough to narrate unnamed ("the
+church"); by contrast a campus has *many* unnamed sculptures, pool basins, and out-buildings, which
+as category-label tokens (`swimming pool`, `maritime`) are pure noise. A fixed default (not a toggle
+— model-affecting, unlike the render-only [[markdownmap-settings]]). Tightens ADR-0012's original
+tiered rule to its intent. See ADR-0012 and ADR-0018.
 
 ### District (Cluster)
 A named group of lower-tier Features shown as a single block instead of individual

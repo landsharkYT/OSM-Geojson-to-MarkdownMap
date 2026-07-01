@@ -178,7 +178,9 @@ public sealed class MapGenerator
                 string sal = SalienceOf(f);
                 bool named = !string.IsNullOrEmpty(f.Properties.Name);
                 if (sal == SalienceClassifier.Clustered) continue;      // residential/minor
-                if (!named && sal != SalienceClassifier.Core) continue; // unnamed non-core noise (ADR-0012)
+                // Unnamed features cluster unless worship — the only category worth a nameless token
+                // ("the church"); pools/sculptures/out-buildings become noise otherwise (ADR-0012, refined).
+                if (!named && !SalienceClassifier.IsWorship(f.Properties.Category)) continue;
                 if (sal == SalienceClassifier.Core) { promoted.Add(f); continue; } // guaranteed
                 budgeted.Add(f);                                        // competes for the budget
             }

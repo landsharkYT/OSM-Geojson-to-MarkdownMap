@@ -25,17 +25,20 @@ public static class SalienceClassifier
     private static readonly HashSet<string> BudgetedLandmark = new(StringComparer.Ordinal)
     { "artwork", "viewpoint", "memorial", "monument" };
 
-    // Sizeable leisure venues → core; small facilities (gym, playground, pitch…) → budgeted.
+    // Destination-scale leisure venues → core; facilities (pool, rink, gym, playground…) → budgeted
+    // (ADR-0018): a pool basin is not a stadium, and unnamed ones would otherwise flood the map.
     private static readonly HashSet<string> CoreLeisure = new(StringComparer.Ordinal)
-    { "marina", "stadium", "sports_centre", "golf_course", "swimming_pool", "ice_rink" };
+    { "marina", "stadium", "sports_centre", "golf_course" };
+
+    // Worship subclasses — the one category singular/evocative enough to promote while unnamed.
+    private static readonly HashSet<string> Worship = new(StringComparer.Ordinal)
+    { "place_of_worship", "church", "cathedral", "chapel", "mosque", "synagogue", "temple" };
 
     /// <summary>Salience class for a normalized <c>class.subclass</c> category.</summary>
     public static string Of(string? category)
     {
         if (string.IsNullOrEmpty(category)) return Budgeted;
-        int dot = category!.IndexOf('.');
-        string klass = dot < 0 ? category : category.Substring(0, dot);
-        string sub = dot < 0 ? "" : category.Substring(dot + 1);
+        var (klass, sub) = Split(category!);
         return klass switch
         {
             "landmark" => BudgetedLandmark.Contains(sub) ? Budgeted : Core,
@@ -44,5 +47,22 @@ public static class SalienceClassifier
             "residential" => Clustered,
             _ => Budgeted, // food, shop, lodging, transit …
         };
+    }
+
+    /// <summary>
+    /// True for a worship category. An unnamed Feature promotes only if worship (the canonical
+    /// "the church" case); every other unnamed Feature clusters (ADR-0012, refined).
+    /// </summary>
+    public static bool IsWorship(string? category)
+    {
+        if (string.IsNullOrEmpty(category)) return false;
+        var (klass, sub) = Split(category!);
+        return klass == "landmark" && Worship.Contains(sub);
+    }
+
+    private static (string klass, string sub) Split(string category)
+    {
+        int dot = category.IndexOf('.');
+        return dot < 0 ? (category, "") : (category.Substring(0, dot), category.Substring(dot + 1));
     }
 }

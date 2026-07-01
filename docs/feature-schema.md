@@ -97,12 +97,14 @@ promotion; `tier`/`importance` only *order* features:
   townhall, police, fire station), historic, museum/gallery/attraction, major leisure venues (marina,
   stadium, sports centre, golf course) → always **Promoted**.
 - **budgeted** — **commemorative** landmarks (artwork, viewpoint, memorial, monument, base 45),
-  food, shops, **private** civic (dentist, clinic, pharmacy, doctors, veterinary), small leisure,
-  lodging → **Promoted** only if it wins the per-District **promotion budget** (top-K by importance);
-  the rest **Clustered**. Venues outrank commemoratives within the budget.
+  food, shops, **private** civic (dentist, clinic, pharmacy, doctors, veterinary), **leisure
+  facilities** (pool, ice rink, gym, playground, pitch — *not* the marina/stadium/sports-centre/golf
+  venues, which are core), lodging → **Promoted** only if it wins the per-District **promotion
+  budget** (top-K by importance); the rest **Clustered**. Venues outrank commemoratives.
 - **clustered** — residential (and `minor`/`structure` tiers) → count only.
-- **Tiered unnamed promotion (ADR-0012):** an unnamed feature is promoted only when its salience is
-  **core**; unnamed budgeted features cluster (never compete), so nameless noise never gets a token.
+- **Unnamed promotion (worship-only, ADR-0012 refined):** an unnamed feature earns a token **only if
+  it is worship** ("the church"); every other unnamed feature clusters whatever its salience — so a
+  campus's nameless pool basins, sculptures, and out-buildings never become category-label tokens.
 
 ## 6. Polygon → point, de-duplication, street snap
 
