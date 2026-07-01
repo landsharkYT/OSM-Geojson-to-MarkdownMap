@@ -72,9 +72,11 @@ public static class Classifier
     // Named institutional buildings that are singular civic landmarks → civic core (ADR-0019).
     // `university`/`college` are handled separately (many halls per campus → budgeted venue-band);
     // `stadium` → leisure core; `train_station` → the station path; `dormitory` → lodging core.
+    // `government`/`public` are deliberately excluded: they collide with the budgeted office subclass
+    // `civic.government` and are rare/redundant with an amenity — no false core path (ADR-0018 note).
     private static readonly HashSet<string> InstitutionCoreBuilding = new(StringComparer.Ordinal)
     {
-        "school", "hospital", "civic", "government", "public", "fire_station",
+        "school", "hospital", "civic", "fire_station",
     };
     // Scene landmarks among man_made (the rest — poles, masts, manholes — are infrastructure noise).
     // A pier is often a LineString; RepresentativePoint reduces it to a point like any way.
@@ -115,10 +117,11 @@ public static class Classifier
             ("landmark", true) => 45,
             // Private practices (pharmacy/clinic) sit above commodity; civic OFFICES rank below
             // venues (a dept/gov office is less scene-worthy than a place you enter) — base 45.
-            // Offices rank below venues (45); a campus HALL sits at the venue band (55 → 65 with a
-            // name, then an area nudge in the Normalizer); private practices sit above commodity (60).
-            ("civic", true) => OfficeCivic.Contains(subclass) ? 45
-                                : SalienceClassifier.IsAreaRankedBuilding(category) ? 55 : 60,
+            // Offices rank below venues (45); every other budgeted civic — campus halls, private
+            // practices (dentist/clinic), healthcare passthrough, social_facility — sits at the venue
+            // band (55 → 65 with a name, halls then take a footprint nudge in the Normalizer). ADR-0018
+            // note: private practices dropped 60 → 55 so they tie venues instead of outranking them.
+            ("civic", true) => OfficeCivic.Contains(subclass) ? 45 : 55,
             _ => BaseScore(klass, subclass),
         };
 

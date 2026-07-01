@@ -51,6 +51,8 @@ public class TerrainClassifierTests
     [InlineData("landuse", "recreation_ground", "park")]
     [InlineData("natural", "beach", "park")]      // shore → park-like terrain
     [InlineData("natural", "wetland", "park")]    // marsh → park-like terrain
+    [InlineData("landuse", "cemetery", "park")]   // a named graveyard is a walkable area you go to
+    [InlineData("amenity", "grave_yard", "park")]
     public void Area_kinds(string k, string v, string kind)
     {
         var (got, name) = TerrainClassifier.Area(Tags(k, v, "name", "Greenway"));

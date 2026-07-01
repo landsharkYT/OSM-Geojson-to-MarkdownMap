@@ -59,7 +59,7 @@ Top-level class drives base importance. Subclass = the OSM value (passed through
 | class | OSM source (examples) | base tier |
 |---|---|---|
 | `landmark` | `tourism`=artwork/viewpoint; `amenity`=place_of_worship; `building`=church; `historic`=*; `man_made`=**pier** (core — a moorage is the waterfront's address) / tower/lighthouse/water_tower/bridge/obelisk/windmill/communications_tower (set-dressing, base 45) | landmark |
-| `civic` | institutions `amenity`=school/library/hospital/post_office (core, base 80); singular institution **buildings** `building`=school/hospital/civic/government/public/fire_station and a named `railway`/`public_transport`=**station** (core, base 80); a **campus hall** `building`=university/college → `civic.<t>_building` (**budgeted venue-band**, base 55 + a footprint-area nudge — many halls per campus, so they compete, ADR-0019); private `amenity`=dentist/clinic/pharmacy + `healthcare` (base 60); `office`=government/educational_institution/research/research_institute/diplomatic (budgeted **below venues**, base 45 — often redundant with the core institution building) | landmark / destination |
+| `civic` | **core = an allowlist** of public institutions (`amenity`=school/college/university/library/hospital/post_office/townhall/police/fire_station/courthouse/community_centre/kindergarten, a named **station**, and the institution **buildings** `building`=school/hospital/civic/fire_station), base 80; **everything else civic defaults to budgeted** at the venue band (base 55 → 65 with a name): private `amenity`=dentist/clinic/doctors/pharmacy/veterinary/social_facility + `healthcare`=* passthrough, and the **campus hall** `building`=university/college → `civic.<t>_building` (+ a footprint-area nudge, ADR-0019); `office`=government/educational_institution/research/research_institute/diplomatic sit **below venues** (base 45) | landmark / destination |
 | `food` | `amenity`=restaurant/cafe/bar/pub/fast_food; `shop`=deli | destination |
 | `shop` | `shop`=* (convenience, hairdresser, beauty, bicycle, …); `craft`=* (brewery/distillery/repair); `amenity`=bank/fuel/marketplace (commercial services, chain-penalised) | destination |
 | `leisure` | `leisure`=marina/fitness_centre/playground/pitch/slipway (pool/rink → budgeted facilities); `amenity`=theatre/cinema/arts_centre/events_venue/nightclub/boat_rental/spa/makerspace/studio/coworking_space (entertainment/recreation venues) | destination |
@@ -67,7 +67,7 @@ Top-level class drives base importance. Subclass = the OSM value (passed through
 | `residential` | named `building`=house/apartments/**houseboat**/floating_home/detached | minor |
 | `transit` | `highway`=bus_stop / `public_transport`=platform (mostly deferred) | minor |
 | terrain → `water` | `natural`=water/**bay**/coastline; `waterway`=canal/river; named lakes | n/a |
-| terrain → `park` | `leisure`=park; `landuse`=recreation_ground; `natural`=**beach**/**wetland** (coarse shore/marsh, area-filtered) | n/a |
+| terrain → `park` | `leisure`=park; `landuse`=recreation_ground/**cemetery** or `amenity`=**grave_yard** (a named graveyard is a walkable area you go to); `natural`=**beach**/**wetland** (coarse shore/marsh, area-filtered) | n/a |
 
 > Note: locally-characteristic building types (e.g. `houseboat`/`floating_home` in a
 > waterfront area) are kept as `residential` so such colonies cluster with flavor rather
@@ -76,8 +76,9 @@ Top-level class drives base importance. Subclass = the OSM value (passed through
 ## 5. Importance & promotion (v1 default — tunable)
 
 ```
-base   = { core-landmark:80, civic-institution:80, civic-private:60,
-           campus-hall|food|shop|leisure|lodging:55, commemorative-landmark:45, residential:30 }[category]
+base   = { core-landmark:80, civic-institution:80,
+           campus-hall|civic-private|food|shop|leisure|lodging:55, civic-office:45,
+           commemorative-landmark:45, residential:30 }[category]
 score  = base
        + (resolvedName != null ? 10 : 0)   // name|brand|operator (ADR-0012)
        + (class==landmark      ?  5 : 0)
@@ -94,15 +95,17 @@ and shops win the budget before its sculptures (a DM's party enters buildings, w
 
 **Narrative salience (ADR-0018)** — computed from the `category` (see `SalienceClassifier`), decides
 promotion; `tier`/`importance` only *order* features:
-- **core** — worship, civic **institutions** (school, library, hospital, post office, university,
-  townhall, police, fire station), singular institution **buildings** (`building`=school/hospital/
-  civic/government/public/fire_station/stadium, and a named **station**), dorms
+- **core** — worship, civic **institutions** (an **allowlist**: school, college, university, library,
+  hospital, post office, townhall, police, fire station, courthouse, community centre, kindergarten),
+  singular institution **buildings** (`building`=school/hospital/civic/fire_station/stadium, and a
+  named **station**), dorms
   (`amenity`=student_accommodation *or* `building`=dormitory), historic, museum/gallery/attraction,
   major leisure venues (marina, stadium, sports centre, golf course) → always **Promoted**.
 - **budgeted** — **commemorative** landmarks (artwork, viewpoint, memorial, monument, base 45),
   food, shops, **campus halls** (`building`=university/college, base 55 + footprint nudge — many per
-  campus, so they compete like venues, ADR-0019), **private** civic (dentist, clinic, pharmacy,
-  doctors, veterinary), **leisure facilities** (pool, ice rink, gym, playground, pitch — *not* the
+  campus, so they compete like venues, ADR-0019), **private/other civic** (dentist, clinic, doctors,
+  pharmacy, veterinary, `healthcare`=* passthrough, social_facility — everything civic *not* in the
+  core allowlist, base 55), **leisure facilities** (pool, ice rink, gym, playground, pitch — *not* the
   marina/stadium/sports-centre/golf venues, which are core), lodging → **Promoted** only if it wins
   the per-District **promotion budget** (top-K by importance); the rest **Clustered**. Venues (incl.
   halls) outrank commemoratives.

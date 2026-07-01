@@ -6,6 +6,19 @@ Status: Accepted
 > **Refined by ADR-0019** — institutional buildings: singular institutions/stations/dorm buildings
 > join the **core**, while `building=university`/`college` campus halls are **budgeted venue-band**
 > competitors with a footprint-area nudge (so a campus's 100+ halls don't flood the budget).
+>
+> **Update 2026-07-01 — civic salience is an ALLOWLIST, not a denylist.** `SalienceClassifier` keyed
+> `civic` as *core unless explicitly budgeted*, so `healthcare=*` passthrough (psychotherapist,
+> physiotherapist, alternative) and `amenity=social_facility` silently fell through to **core at
+> importance 90** — always promoted, bypassing the budget, flooding a medical-dense district. Inverted
+> to a positive `CoreCivicInstitution` allowlist (school/college/university/library/hospital/
+> post_office/townhall/police/fire_station/courthouse/station/community_centre/civic/kindergarten);
+> **everything else civic defaults to budgeted** and competes. Fail-safe: an un-enumerated civic
+> subclass now budgets rather than promoting at institution rank. Same change dropped private practices
+> (dentist/clinic/doctors) from base **60 → 55** so they tie venues instead of outranking them, and
+> dropped `government`/`public` from the institution-building set (they collide with the budgeted
+> `civic.government` office subclass). Net on the real campus extract: promoted medical offices 28 → 9,
+> venues surfaced 11 → 33, ~340 fewer tokens.
 
 Extends [ADR-0012](0012-name-resolution-and-co-location-merge.md) (name resolution, importance,
 tiered unnamed promotion). ADR-0012's promotion rule — *every `landmark` and named `destination` Feature

@@ -15,12 +15,16 @@ public static class SalienceClassifier
     public const string Budgeted = "budgeted";   // competes for the per-District budget
     public const string Clustered = "clustered"; // never its own token
 
-    // Public civic institutions → core; private practices and civic offices → budgeted (a department
-    // or gov office is lesser than the institution building itself, which stays core).
-    private static readonly HashSet<string> BudgetedCivic = new(StringComparer.Ordinal)
+    // Civic salience is an ALLOWLIST (ADR-0018 refined): the public institutions a DM orients on are
+    // core; EVERYTHING else civic — private practices (dentist/clinic/doctors), `healthcare=*`
+    // passthrough (psychotherapist/physiotherapist/alternative), social_facility, offices
+    // (government/research), and campus `_building` halls — defaults to budgeted and competes for the
+    // promotion budget. Fail-safe toward competing, not flooding: a civic subclass nobody enumerated
+    // (a new `healthcare=*` value) budgets rather than silently promoting at institution rank.
+    private static readonly HashSet<string> CoreCivicInstitution = new(StringComparer.Ordinal)
     {
-        "dentist", "clinic", "pharmacy", "doctors", "veterinary",           // private practices
-        "government", "educational_institution", "research", "research_institute", "diplomatic", // offices
+        "school", "college", "university", "library", "hospital", "post_office", "townhall",
+        "police", "fire_station", "courthouse", "station", "community_centre", "civic", "kindergarten",
     };
 
     // Commemorative / decorative landmarks — public art, viewpoints, memorials, monuments, and
@@ -57,7 +61,7 @@ public static class SalienceClassifier
         return klass switch
         {
             "landmark" => BudgetedLandmark.Contains(sub) ? Budgeted : Core,
-            "civic" => BudgetedCivic.Contains(sub) || AreaRankedBuilding.Contains(sub) ? Budgeted : Core,
+            "civic" => CoreCivicInstitution.Contains(sub) ? Core : Budgeted,
             "leisure" => CoreLeisure.Contains(sub) ? Core : Budgeted,
             // A dorm is a residential address you go to (like a moorage) → core; hotels compete.
             "lodging" => sub == "student_accommodation" ? Core : Budgeted,

@@ -51,7 +51,10 @@ Features into: a **core** that always promotes (worship, civic **institutions** 
 hospital, post office, and singular institution *buildings* like a hospital/school/stadium/**station** —
 historic sites, museums/galleries/attractions, major venues, and the **residential addresses** of a
 neighbourhood: **named piers/moorages** in a waterfront community and **dorms** on a campus — the
-skeleton the party lives/moves among); **budgeted** competitors that vie for the [[promotion-budget]];
+skeleton the party lives/moves among). Civic core is an **allowlist** of those public institutions —
+everything else civic (a private practice, a `healthcare` clinic, a social facility, a dept office, a
+campus hall) **defaults to budgeted and competes**, so an un-enumerated civic tag can never silently
+promote at institution rank. **Budgeted** competitors vie for the [[promotion-budget]];
 and **clustered** (residential/minor). A **campus hall** (`building=university`/`college`) is *not*
 core — a campus has dozens, so a hall is a **budgeted venue-band destination** that competes like a
 café, with a small **footprint-area** nudge so the big halls out-sort the annexes (ADR-0019).
@@ -307,7 +310,7 @@ frame so it need not triangulate per-Feature bearings.
 
 ### Terrain
 The orienting context block: named water bodies (lakes, bays), parks and other **coarse
-geographic areas** (beaches, wetlands), and Barriers with their rough position, so the LLM knows
+geographic areas** (beaches, wetlands, cemeteries), and Barriers with their rough position, so the LLM knows
 "the shape of the place" (what's water, what's shore/green, what blocks movement). Such areas are
 **terrain, not POI tokens** — a beach is a place you walk to, like a park, not a point.
 The **markdown** projection is deliberately **coarse — name · octant** — and stays that

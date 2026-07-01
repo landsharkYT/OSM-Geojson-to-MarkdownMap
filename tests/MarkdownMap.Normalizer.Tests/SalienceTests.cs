@@ -180,4 +180,42 @@ public class SalienceTests
         var c = Classify(("building", "university"), ("amenity", "cafe"), ("name", "Atrium Coffee"));
         Assert.Equal("food.cafe", c.Category);
     }
+
+    [Fact]
+    public void Civic_salience_is_an_allowlist_so_unenumerated_civic_defaults_to_budgeted()
+    {
+        // The core-leak fix (ADR-0018 note): a `healthcare=*` passthrough and social_facility used to
+        // fall through to CORE at importance 90 (always promoted). Now civic is an ALLOWLIST — only the
+        // public institutions are core; everything else civic competes at the venue band (65).
+        foreach (var (k, v) in new[] { ("healthcare", "psychotherapist"), ("healthcare", "physiotherapist"),
+                                       ("healthcare", "alternative"), ("amenity", "social_facility") })
+        {
+            var c = Classify((k, v), ("name", "Sample"));
+            Assert.Equal("budgeted", c.Salience);
+            Assert.Equal(65, c.Importance); // 55 venue band + 10 name — no longer 90
+        }
+    }
+
+    [Fact]
+    public void Private_practices_tie_venues_instead_of_outranking_them()
+    {
+        // Private practices dropped 60 → 55 base so a dentist no longer outranks a café or a hall.
+        var dentist = Classify(("amenity", "dentist"), ("name", "Bright Smiles"));
+        var cafe = Classify(("amenity", "cafe"), ("name", "The Grind"));
+        var hall = Classify(("building", "university"), ("name", "Maple Hall"));
+        Assert.Equal("budgeted", dentist.Salience);
+        Assert.Equal(cafe.Importance, dentist.Importance);   // tie the venue band
+        Assert.Equal(hall.Importance, dentist.Importance);
+    }
+
+    [Fact]
+    public void The_core_public_institutions_stay_core()
+    {
+        foreach (var amenity in new[] { "school", "library", "hospital", "post_office", "police",
+                                        "fire_station", "community_centre", "kindergarten" })
+            Assert.Equal("core", Classify(("amenity", amenity), ("name", "Sample")).Salience);
+        // ...and they still outrank the budgeted competitors.
+        Assert.True(Classify(("amenity", "library"), ("name", "X")).Importance
+                    > Classify(("amenity", "dentist"), ("name", "Y")).Importance);
+    }
 }

@@ -39,8 +39,10 @@ public static class TerrainClassifier
         tags.TryGetValue("natural", out var nat);
         if (nat is "water" or "bay")                       // named lakes AND bays are water terrain
             return ("water", name);
+        tags.TryGetValue("landuse", out var lu);
         if ((tags.TryGetValue("leisure", out var l) && l == "park")
-            || (tags.TryGetValue("landuse", out var lu) && lu == "recreation_ground")
+            || lu is "recreation_ground" or "cemetery"     // a graveyard is a walkable named area you go to
+            || (tags.TryGetValue("amenity", out var am) && am == "grave_yard")
             || nat is "beach" or "wetland")                // coarse shore/marsh areas → park-like terrain
             return ("park", name);
         return (null, null);
