@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using MarkdownMap.Contract;
 
 namespace MarkdownMap.Normalizer;
 
 /// <summary>Result of classifying an OSM element as a poi. Null = not a poi (gated out).</summary>
-public sealed record Classification(string Category, int Importance, string Tier);
+public sealed record Classification(string Category, int Importance, string Tier, string Salience);
 
 /// <summary>
 /// Inclusion gate + taxonomy + importance scoring for step 1 (poi only).
@@ -74,12 +75,20 @@ public static class Classifier
         var (klass, subclass) = ClassifyKind(tags, amenity, hasName);
         if (klass is null || subclass is null) return null;
 
-        int score = BaseScore(klass)
+        string category = $"{klass}.{subclass}";
+        string salience = SalienceClassifier.Of(category);
+
+        // Chain penalty (ADR-0018): a `brand`-tagged Feature is a chain, so it loses the promotion
+        // budget to independents. The penalty exceeds the name bonus, netting a chain below an
+        // equivalent independent while still keeping it above the clustered floor.
+        bool isChain = tags.ContainsKey("brand") || tags.ContainsKey("brand:wikidata");
+        int score = BaseScore(klass, subclass)
                     + (hasName ? 10 : 0)
-                    + (klass == "landmark" ? 5 : 0);
+                    + (klass == "landmark" ? 5 : 0)
+                    - (isChain ? 15 : 0);
         score = Math.Max(0, Math.Min(100, score));
 
-        return new Classification($"{klass}.{subclass}", score, TierOf(score));
+        return new Classification(category, score, TierOf(score), salience);
     }
 
     private static (string? klass, string? subclass) ClassifyKind(
@@ -116,9 +125,15 @@ public static class Classifier
         return (null, null);
     }
 
-    private static int BaseScore(string klass) => klass switch
+    // Private civic practices (dentist, clinic, …) are budgeted, not institutional, so they score
+    // like commodity destinations rather than landmarks (ADR-0018).
+    private static readonly HashSet<string> PrivateCivic = new(StringComparer.Ordinal)
+    { "dentist", "clinic", "pharmacy", "doctors", "veterinary" };
+
+    private static int BaseScore(string klass, string subclass) => klass switch
     {
-        "landmark" or "civic" => 80,
+        "civic" => PrivateCivic.Contains(subclass) ? 60 : 80,
+        "landmark" => 80,
         "food" or "shop" or "leisure" or "lodging" => 55,
         _ => 30, // residential
     };

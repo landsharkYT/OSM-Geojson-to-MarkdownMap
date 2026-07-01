@@ -51,20 +51,17 @@ public sealed class MapGenerator
         bool hasDistricts = anchors.Count > 0;
 
         var pois = fc.Features.Where(f => f.Properties.Kind == "poi").ToList();
-        // Tiered unnamed promotion (ADR-0012): an unnamed feature earns its own token only at
-        // landmark tier; unnamed destination/lower features fold into a district's clustered count.
-        bool Promoted(Feature f)
-        {
-            if (!hasDistricts) return true;
-            if (f.Properties.Tier == "minor") return false;
-            bool named = !string.IsNullOrEmpty(f.Properties.Name);
-            return named || f.Properties.Tier == "landmark";
-        }
-        var promotedF = pois.Where(Promoted)
+        // Promotion (ADR-0018): assign each poi its District first, then per District the salience
+        // `core` always promotes, `budgeted` features fill up to the promotion budget by importance,
+        // and the rest — `clustered`, or unnamed non-core noise (ADR-0012) — fold into the count.
+        string? DistrictKey(Feature f) =>
+            hasDistricts ? Districts.Nearest(GeoJsonReader.PointOf(f), anchors) : null;
+        var promotedSet = SelectPromoted(pois, DistrictKey, _opts.PromotionBudget);
+        var promotedF = pois.Where(promotedSet.Contains)
             .OrderByDescending(f => f.Properties.Importance ?? 0)
             .ThenBy(f => f.Properties.OsmId, StringComparer.Ordinal)
             .ToList();
-        var minorF = pois.Where(f => !Promoted(f)).ToList();
+        var minorF = pois.Where(f => !promotedSet.Contains(f)).ToList();
 
         var points = promotedF.Select(GeoJsonReader.PointOf).ToList();
         int pad = Math.Max(2, promotedF.Count.ToString(CultureInfo.InvariantCulture).Length);
@@ -160,6 +157,38 @@ public sealed class MapGenerator
             Terrain = BuildTerrain(fc, fc.Properties.Bounds),
         };
         return Compose(model);
+    }
+
+    /// <summary>
+    /// Narrative salience + per-District promotion budget (ADR-0018). Salience is read from the
+    /// schema, falling back to the shared category classifier for schema-less GeoJSON.
+    /// </summary>
+    private static HashSet<Feature> SelectPromoted(
+        List<Feature> pois, Func<Feature, string?> districtKey, int budget)
+    {
+        string SalienceOf(Feature f) =>
+            f.Properties.Salience ?? SalienceClassifier.Of(f.Properties.Category);
+
+        var promoted = new HashSet<Feature>();
+        foreach (var group in pois.GroupBy(f => districtKey(f) ?? ""))
+        {
+            var budgeted = new List<Feature>();
+            foreach (var f in group)
+            {
+                string sal = SalienceOf(f);
+                bool named = !string.IsNullOrEmpty(f.Properties.Name);
+                if (sal == SalienceClassifier.Clustered) continue;      // residential/minor
+                if (!named && sal != SalienceClassifier.Core) continue; // unnamed non-core noise (ADR-0012)
+                if (sal == SalienceClassifier.Core) { promoted.Add(f); continue; } // guaranteed
+                budgeted.Add(f);                                        // competes for the budget
+            }
+            foreach (var f in budgeted
+                .OrderByDescending(f => f.Properties.Importance ?? 0)
+                .ThenBy(f => f.Properties.OsmId, StringComparer.Ordinal)
+                .Take(Math.Max(0, budget)))
+                promoted.Add(f);
+        }
+        return promoted;
     }
 
     private List<District> BuildDistricts(
@@ -263,9 +292,9 @@ public sealed class MapGenerator
         var sb = new StringBuilder();
         sb.Append("# MARKDOWNMAP — ").Append(m.Title).Append("\n\n");
         if (_opts.DirectivePreamble) AppendPreamble(sb);
-        AppendHowToRead(sb, m.Districts.Count > 0, m.Terrain.Count > 0);
+        AppendHowToRead(sb, m.Districts.Count > 0, TerrainShown(m.Terrain, _opts.MinTerrainAreaM2));
         AppendBounds(sb, m.Bounds);
-        AppendTerrain(sb, m.Terrain);
+        AppendTerrain(sb, m.Terrain, _opts.MinTerrainAreaM2);
         if (m.Districts.Count > 0) AppendDistricts(sb, m.Districts);
         AppendConnections(sb, m.Features, m.Edges, m.Districts);
         return sb.ToString();
@@ -337,14 +366,56 @@ public sealed class MapGenerator
         }
     }
 
-    private static void AppendTerrain(StringBuilder sb, List<TerrainEntry> terrain)
+    private static void AppendTerrain(StringBuilder sb, List<TerrainEntry> terrain, double minAreaM2)
     {
-        if (terrain.Count == 0) return;
+        var shown = terrain.Where(e => TerrainShownInMarkdown(e, minAreaM2)).ToList();
+        if (shown.Count == 0) return;
         sb.Append("## Terrain & barriers\n\n");
-        foreach (var e in terrain)
-            sb.Append("- ").Append(e.Name).Append(" (").Append(e.KindLabel).Append(") · ")
-              .Append(e.Position).Append(" · ").Append(e.Note).Append('\n');
+        foreach (var e in shown) sb.Append("- ").Append(TerrainLine(e)).Append('\n');
         sb.Append('\n');
+    }
+
+    /// <summary>Whether any terrain entry survives the markdown area filter (ADR-0017).</summary>
+    internal static bool TerrainShown(List<TerrainEntry> terrain, double minAreaM2) =>
+        terrain.Any(e => TerrainShownInMarkdown(e, minAreaM2));
+
+    /// <summary>
+    /// Orienting-scale filter (ADR-0017): a park/water **polygon** is listed in the markdown only
+    /// if it is at least <paramref name="minAreaM2"/>. Barriers and linear shorelines/canals always show.
+    /// </summary>
+    internal static bool TerrainShownInMarkdown(TerrainEntry e, double minAreaM2) =>
+        !(e.Kind is "water" or "park") || e.GeometryType != "Polygon" || TerrainAreaM2(e) >= minAreaM2;
+
+    /// <summary>
+    /// One markdown terrain line: `Name (kindLabel) · position`. The redundant `green space` /
+    /// `open water` note is dropped (the label says it); the barrier note is kept (ADR-0017).
+    /// </summary>
+    internal static string TerrainLine(TerrainEntry e)
+    {
+        var s = e.Name + " (" + e.KindLabel + ") · " + e.Position;
+        if (e.Kind == "barrier" && !string.IsNullOrEmpty(e.Note)) s += " · " + e.Note;
+        return s;
+    }
+
+    /// <summary>Metric polygon area (shoelace over the entry's rings); 0 for non-polygons.</summary>
+    internal static double TerrainAreaM2(TerrainEntry e)
+    {
+        if (e.GeometryType != "Polygon") return 0;
+        double total = 0;
+        foreach (var ring in e.Parts)
+        {
+            if (ring.Length < 3) continue;
+            double mPerLon = 111_320.0 * Math.Cos(ring[0][1] * Math.PI / 180.0);
+            const double mPerLat = 110_540.0;
+            double cross = 0;
+            for (int i = 0; i < ring.Length; i++)
+            {
+                var a = ring[i]; var b = ring[(i + 1) % ring.Length];
+                cross += (a[0] * mPerLon) * (b[1] * mPerLat) - (b[0] * mPerLon) * (a[1] * mPerLat);
+            }
+            total += Math.Abs(cross) / 2.0;
+        }
+        return total;
     }
 
     private static void AppendDistricts(StringBuilder sb, List<District> districts)

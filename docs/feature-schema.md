@@ -29,6 +29,7 @@ A single `FeatureCollection`:
 | `category` | string | normalized class.subclass (see §4); poi/place only |
 | `importance` | int 0–100 | computed score (see §5); poi only |
 | `tier` | enum | `landmark` \| `destination` \| `minor` \| `structure`; derived from `importance` |
+| `salience` | enum | `core` \| `budgeted` \| `clustered`; drives promotion (ADR-0018); poi only |
 | `street` | string \| null | poi only; `addr:street` or snapped road name (§6) |
 | `streetApprox` | bool | poi only; true = snapped (render as `near` not `on`) |
 | `barrierClass` | string | barrier only: `motorway` \| `rail` \| `water` |
@@ -58,7 +59,7 @@ Top-level class drives base importance. Subclass = the OSM value (passed through
 | class | OSM source (examples) | base tier |
 |---|---|---|
 | `landmark` | `tourism`=artwork/viewpoint; `amenity`=place_of_worship; `building`=church; `historic`=* | landmark |
-| `civic` | `amenity`=school/library/post_office; `healthcare`/`amenity`=dentist/clinic/pharmacy | landmark |
+| `civic` | institutions `amenity`=school/library/hospital/post_office (base 80); private `amenity`=dentist/clinic/pharmacy + `healthcare` (base 60) | landmark / destination |
 | `food` | `amenity`=restaurant/cafe/bar/pub/fast_food; `shop`=deli | destination |
 | `shop` | `shop`=* (convenience, hairdresser, beauty, bicycle, …) | destination |
 | `leisure` | `leisure`=marina/fitness_centre/swimming_pool/playground/pitch/slipway | destination |
@@ -72,29 +73,31 @@ Top-level class drives base importance. Subclass = the OSM value (passed through
 > waterfront area) are kept as `residential` so such colonies cluster with flavor rather
 > than being dropped.
 
-## 5. Importance formula (v1 default — tunable)
+## 5. Importance & promotion (v1 default — tunable)
 
 ```
-base   = { landmark:80, destination:55, minor:30 }[classBaseTier]
+base   = { landmark:80, civic-institution:80, civic-private:60,
+           food|shop|leisure|lodging:55, residential:30 }[category]
 score  = base
-       + (resolvedName != null ? 10 : 0)  // name|brand|operator (ADR-0012)
-       + (class==landmark    ?  5 : 0)
-       - (isChainNoise        ?  5 : 0)   // e.g. generic fast_food; optional
+       + (resolvedName != null ? 10 : 0)   // name|brand|operator (ADR-0012)
+       + (class==landmark      ?  5 : 0)
+       - (isChain              ? 15 : 0)    // has a `brand`/`brand:wikidata` tag (ADR-0018)
 score  = clamp(score, 0, 100)
 
-tier   = score>=75 ? landmark
-       : score>=50 ? destination
-       : score>=25 ? minor
-       :             structure
+tier   = score>=75 ? landmark : score>=50 ? destination : score>=25 ? minor : structure
 ```
 
-Render policy (also tunable, see settings):
-- `landmark` + `destination` → **Promoted** (own token).
-- `minor` → **Clustered** by default; promoted only where a District is sparse.
-- `structure` → count only.
-- **Tiered unnamed promotion (ADR-0012):** a feature still **unnamed** after resolution is
-  promoted only at `landmark` tier; unnamed `destination`/lower features are demoted to the
-  District clustered count, so nameless noise never gets its own token.
+**Narrative salience (ADR-0018)** — computed from the `category` (see `SalienceClassifier`), decides
+promotion; `tier`/`importance` only *order* features:
+- **core** — worship, civic **institutions** (school, library, hospital, post office, university,
+  townhall, police, fire station), historic, museum/gallery/attraction/monument, major leisure
+  venues (marina, stadium, sports centre, golf course) → always **Promoted**.
+- **budgeted** — artwork, viewpoint, food, shops, **private** civic (dentist, clinic, pharmacy,
+  doctors, veterinary), small leisure, lodging → **Promoted** only if it wins the per-District
+  **promotion budget** (top-K by importance); the rest **Clustered**.
+- **clustered** — residential (and `minor`/`structure` tiers) → count only.
+- **Tiered unnamed promotion (ADR-0012):** an unnamed feature is promoted only when its salience is
+  **core**; unnamed budgeted features cluster (never compete), so nameless noise never gets a token.
 
 ## 6. Polygon → point, de-duplication, street snap
 

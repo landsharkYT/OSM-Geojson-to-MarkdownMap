@@ -31,6 +31,7 @@ export interface PromotedFeature {
   category: string
   importance: number
   tier: string
+  salience?: string // core | budgeted | clustered (ADR-0018)
   street?: string
   streetApprox?: boolean
   district?: string

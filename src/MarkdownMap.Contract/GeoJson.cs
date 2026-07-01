@@ -50,6 +50,9 @@ namespace MarkdownMap.Contract
         /// <summary>landmark | destination | minor | structure</summary>
         public string? Tier { get; set; }
 
+        /// <summary>Narrative salience (ADR-0018): core | budgeted | clustered. poi only.</summary>
+        public string? Salience { get; set; }
+
         // poi (street attribution lands in a later step; null for now)
         public string? Street { get; set; }
         public bool? StreetApprox { get; set; }

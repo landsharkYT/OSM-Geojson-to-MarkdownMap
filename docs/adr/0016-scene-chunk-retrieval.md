@@ -23,7 +23,10 @@ storyteller tell *this* scene," and away from arbitrary, even-but-meaningless pa
 A new **generation** setting, **Chunking**, renders the map as a set of self-contained
 **scene-chunks** instead of one document.
 
-1. **Partition by District, spine-split to scene size.** A chunk = a District (the existing
+1. **Partition by District, spine-split to scene size.** *(The spine-split half of this decision is
+   superseded by [ADR-0017](0017-subdivide-districts-by-density-gap-bisection.md): oversized
+   Districts subdivide by density-gap bisection, not spine segments. District-as-chunk stands.)*
+   A chunk = a District (the existing
    named neighbourhood, anchored on its spine head). Districts over the **scene size** target
    split into contiguous segments **along their spine** (`Old Town · N` / `Old Town · S`) — never
    re-clustered, so a chunk stays spatially contiguous and narratable. Extracts with no `place`

@@ -1,0 +1,77 @@
+# 18. Narrative salience + per-District promotion budget
+
+Date: 2026-07-01
+Status: Accepted
+
+Extends [ADR-0012](0012-name-resolution-and-co-location-merge.md) (name resolution, importance,
+tiered unnamed promotion). ADR-0012's promotion rule — *every `landmark` and named `destination` Feature
+gets a token* — does not survive a dense extract.
+
+## Context
+
+Run against a dense campus + retail extract (~570 kept Features), the pipeline promoted **all** of
+them: ~80 restaurants, ~60 cafés, ~40 clothing shops, every private dental / physiotherapy /
+psychiatry office, two of the same chain coffee shop 100 m apart, and ~45 campus sculptures. Three
+root causes:
+
+- **`civic` is `landmark`-tier and lumps institutions with private practices** — a dentist's office
+  ranked like a school or hospital.
+- **Every `destination` promotes** — `food`/`shop`/`leisure` all promote once named, with no cap.
+- **A resolved `brand` name *raises* importance (+10)** — so chains outranked the independent café
+  next door.
+
+Result: a ~24k-token whole-area map, and (compounding [ADR-0017](0017-subdivide-districts-by-density-gap-bisection.md))
+chunking that fragmented into dozens of trivial one- and two-Feature "scenes". A modest
+neighbourhood extract looked fine only because it *had* fewer such Features — the rules didn't
+adapt, they just weren't stressed. We want the **same rules** to yield a comparably legible map on
+both.
+
+## Decision
+
+A **layered** curation: parse-time salience flags decide *who* is scene-worthy; a per-District
+budget bounds *how many*.
+
+1. **Narrative salience (Stage 1, from tags).** The Normalizer sorts each Feature into:
+   - **core** — always promotes: worship, civic **institutions** (school, library, hospital, post
+     office, university building), historic sites, major venues. (Splits ADR-0012's `civic`:
+     institutions stay core; private practices drop to *budgeted*.)
+   - **budgeted** — competes for a token: artwork/monuments, food, shops, private services
+     (dental, physio, salon, boutique), small leisure.
+   - **clustered** — never its own token: residential, minor, structure.
+
+2. **Chain flag (Stage 1).** A `brand` tag marks a chain and **lowers** importance (and the old
+   `+10` brand-name bonus is removed). Independents win the budget first; a chain still promotes
+   where there's headroom and fades out where density is high. Not exclusion — a lone chain in a
+   sparse block still shows.
+
+3. **Unified per-District promotion budget (Stage 2).** Per District, the salience **core** all
+   promotes; the **budgeted** Features then fill up to **K** remaining seats by importance; the rest
+   fold into the District's clustered count. One budget covers artwork *and* commodity, so neither a
+   sculpture-dense nor a retail-dense area can explode.
+
+4. **Fixed top-K default, tunable.** K is a per-District default (~20). Self-adapting: a dense
+   District clusters most of its long tail; a sparse one promotes nearly all. **Model-affecting**
+   (changes which Features get a token) — a rebuild concern, *not* a render-only knob (ADR-0011).
+
+5. **Pipeline split.** Flags live in Stage 1 (the only stage with tags); the budget lives in Stage 2
+   (Districts are a Stage-2 concept). Clean boundary, no tags leak downstream.
+
+## Consequences
+
+- A hyper-dense extract and a modest one come out comparably legible without per-city tuning; the
+  whole-area token count drops sharply and, with fewer promoted Features, ADR-0017 chunking
+  yields far fewer, more substantial chunks.
+- **The token set shifts** — a Feature that used to have a token may now cluster. This ripples to
+  every downstream consumer (chunk files, a retrieval store keyed on tokens), so it is model-
+  affecting and versionable, not a live toggle.
+- The guaranteed **core** protects the map's backbone (you never budget-out the church or the
+  hospital), which is the main risk of a pure budget.
+- Heuristic defaults: K, the salience→class mapping, and the chain penalty are tunable defaults, not
+  law. Independent of the ADR-0017 **balance guard** (chunk-splitter fix) — both are needed; they
+  address different stages.
+
+Not chosen: **salience-only** (no density bound — a genuinely restaurant-dense block still promotes
+40 restaurants); **budget-only** (no salience — could cluster a key landmark while keeping a chain);
+**commodity-only budget** (leaves the artwork explosion uncapped); **per-km² rate** (truest spatial
+balance but needs a District area + rate constant); **proportional fraction** (scales but doesn't
+bound absolute density).

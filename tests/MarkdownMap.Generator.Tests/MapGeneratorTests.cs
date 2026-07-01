@@ -53,8 +53,10 @@ public class MapGeneratorTests
     public void Terrain_block_lists_water_park_and_barrier_with_positions()
     {
         var md = Generate();
-        Assert.Contains("- Mill Lake (water) · W · open water", md);
-        Assert.Contains("- Riverside Park (park) · N · green space", md);
+        // Orienting-scale water/park are listed; the redundant note is dropped (the label says it),
+        // while the barrier keeps its informative note (ADR-0017).
+        Assert.Matches(@"- Mill Lake \(water\) · [^\n·]+\n", md);       // one field after "·" = note dropped
+        Assert.Matches(@"- Riverside Park \(park\) · [^\n·]+\n", md);
         Assert.Contains("- Route 9 (barrier:motorway) · runs N–S, E · impassable except at crossings", md);
     }
 

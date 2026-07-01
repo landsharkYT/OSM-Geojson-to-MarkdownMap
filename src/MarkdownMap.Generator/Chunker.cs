@@ -8,10 +8,11 @@ namespace MarkdownMap.Generator;
 
 /// <summary>
 /// Scene-chunk retrieval (ADR-0016). Partitions a built <see cref="MapModel"/> into self-contained
-/// scene-chunks — one per District, spine-split when a District exceeds the scene-size target — and
-/// renders each as its own document plus an index manifest. Render-only: reasons purely over the
-/// model's features, edges, districts, and terrain (no re-parse, ADR-0011). Global stable tokens are
-/// kept as-is so a feature reads `[42]` in its own chunk and in any exit that points at it.
+/// scene-chunks — one per District, or a sub-area when a District exceeds the scene-size target,
+/// subdivided by <b>density-gap bisection</b> (ADR-0017) — and renders each as its own document plus
+/// an index manifest. Render-only: reasons purely over the model's features, edges, districts, and
+/// terrain (no re-parse, ADR-0011). Global stable tokens are kept as-is so a feature reads `[42]` in
+/// its own chunk and in any exit that points at it.
 /// </summary>
 internal static class Chunker
 {
@@ -30,10 +31,10 @@ internal static class Chunker
             ? PartitionByDistrict(m)
             : PartitionByComponents(m);
 
-        // 2. Spine-split oversized groups into contiguous segments and materialise chunks.
+        // 2. Subdivide oversized groups (density-gap bisection, ADR-0017) into sub-areas.
         var chunks = new List<Chunk>();
         foreach (var (baseName, members) in groups)
-            chunks.AddRange(SplitToChunks(baseName, members, opts.SceneSize));
+            chunks.AddRange(SplitGroup(baseName, members, opts.SceneSize, m.Edges));
         EnsureUniqueSlugs(chunks);
 
         // token → chunk, so cross-chunk edges become off-map exits and minors land in a chunk.
@@ -93,40 +94,103 @@ internal static class Chunker
             .ToList();
     }
 
-    // ----- spine splitting -----
+    // ----- subdivision (density-gap bisection, ADR-0017) -----
 
-    private static IEnumerable<Chunk> SplitToChunks(string baseName, List<PromotedFeature> members, int sceneSize)
+    private static IEnumerable<Chunk> SplitGroup(
+        string baseName, List<PromotedFeature> members, int sceneSize, List<Edge> allEdges)
     {
         int target = Math.Max(1, sceneSize);
-        if (members.Count <= target)
-        {
-            yield return MakeChunk(baseName, members);
-            yield break;
-        }
+        if (members.Count <= target) return new[] { MakeChunk(baseName, members) };
 
-        var pts = members.Select(f => new LonLat(f.Lon, f.Lat)).ToList();
-        var (_, order) = Spine.Compute(pts);
-        var ordered = order.Select(i => members[i]).ToList();
+        // Recursively cut at the widest density gap on the longer cardinal axis until pieces fit.
+        var pieces = new List<List<PromotedFeature>>();
+        Bisect(members, target, pieces);
 
-        int k = (int)Math.Ceiling(members.Count / (double)target);
-        int baseSize = members.Count / k, extra = members.Count % k; // spread the remainder over the first segments
-        double cLon = members.Average(f => f.Lon), cLat = members.Average(f => f.Lat);
-        var centroid = new LonLat(cLon, cLat);
+        // Repair orphans: a feature with no same-district proximity neighbour in its own piece is
+        // merged into the piece holding its nearest same-district neighbour (ADR-0017).
+        RepairOrphans(pieces, members, allEdges);
+        pieces = pieces.Where(p => p.Count > 0).ToList();
 
+        // Name each piece by its octant within the District; disambiguate collisions with the
+        // piece's key feature. Order pieces stably first so naming is deterministic.
+        var districtCentroid = new LonLat(members.Average(f => f.Lon), members.Average(f => f.Lat));
+        pieces = pieces.OrderBy(p => Top(p).Token, StringComparer.Ordinal).ToList();
         var used = new HashSet<string>(StringComparer.Ordinal);
-        int pos = 0;
-        for (int s = 0; s < k; s++)
+        var chunks = new List<Chunk>(pieces.Count);
+        foreach (var piece in pieces)
         {
-            int size = baseSize + (s < extra ? 1 : 0);
-            var seg = ordered.Skip(pos).Take(size).ToList();
-            pos += size;
-            // Segment suffix = compass bearing of the segment's centre from the District centre,
-            // so an N–S District reads "· N" / "· S" (ADR-0016). Dedup keeps it unique.
-            var segCentroid = new LonLat(seg.Average(f => f.Lon), seg.Average(f => f.Lat));
-            string suffix = Geo.EightWind(centroid, segCentroid);
-            string label = suffix;
-            for (int n = 2; !used.Add(label); n++) label = suffix + " " + n.ToString(CultureInfo.InvariantCulture);
-            yield return MakeChunk(baseName + " · " + label, seg);
+            var c = new LonLat(piece.Average(f => f.Lon), piece.Average(f => f.Lat));
+            string octant = Geo.EightWind(districtCentroid, c);
+            string label = used.Add(octant) ? octant : octant + " — " + Top(piece).Name;
+            used.Add(label);
+            chunks.Add(MakeChunk(baseName + " · " + label, piece));
+        }
+        return chunks;
+    }
+
+    // Recursive axis-aligned binary space partition. Each level splits the subset at its widest gap
+    // along the longer cardinal axis (metric extent); with no dominant gap it splits at the median,
+    // so uniform blobs balance instead of shedding one feature at a time. Leaves have disjoint bboxes.
+    private static void Bisect(List<PromotedFeature> pts, int target, List<List<PromotedFeature>> outp)
+    {
+        if (pts.Count <= target) { outp.Add(pts); return; }
+
+        double clat = pts.Average(p => p.Lat);
+        double mPerLon = 111_320.0 * Math.Cos(clat * Math.PI / 180.0);
+        double spanX = (pts.Max(p => p.Lon) - pts.Min(p => p.Lon)) * mPerLon;
+        double spanY = (pts.Max(p => p.Lat) - pts.Min(p => p.Lat)) * 110_540.0;
+        bool byLon = spanX >= spanY;
+
+        var sorted = (byLon
+            ? pts.OrderBy(p => p.Lon).ThenBy(p => p.Lat).ThenBy(p => p.Token, StringComparer.Ordinal)
+            : pts.OrderBy(p => p.Lat).ThenBy(p => p.Lon).ThenBy(p => p.Token, StringComparer.Ordinal)).ToList();
+        double Coord(PromotedFeature f) => byLon ? f.Lon : f.Lat;
+
+        var gaps = new double[sorted.Count - 1];
+        for (int i = 1; i < sorted.Count; i++) gaps[i - 1] = Coord(sorted[i]) - Coord(sorted[i - 1]);
+        double median = gaps.OrderBy(g => g).ToArray()[gaps.Length / 2];
+
+        // Balance guard (ADR-0017): only consider cuts that leave BOTH sides substantial (≥ a
+        // quarter-ish of the piece), so dense data can't shed size-1/2 slivers. Among those, take the
+        // widest gap — but only if it's a real seam (≥2× median); otherwise split at the median.
+        int minSide = Math.Max(2, sorted.Count / 5);
+        int bestIdx = -1; double bestGap = -1;
+        for (int i = minSide; i <= sorted.Count - minSide; i++)
+            if (gaps[i - 1] > bestGap) { bestGap = gaps[i - 1]; bestIdx = i; }
+        int split = (bestIdx > 0 && median > 0 && bestGap >= 2.0 * median) ? bestIdx : sorted.Count / 2;
+
+        Bisect(sorted.GetRange(0, split), target, outp);
+        Bisect(sorted.GetRange(split, sorted.Count - split), target, outp);
+    }
+
+    private static void RepairOrphans(
+        List<List<PromotedFeature>> pieces, List<PromotedFeature> members, List<Edge> allEdges)
+    {
+        var memberTokens = new HashSet<string>(members.Select(f => f.Token), StringComparer.Ordinal);
+        var pieceOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (int i = 0; i < pieces.Count; i++)
+            foreach (var f in pieces[i]) pieceOf[f.Token] = i;
+
+        // Same-district proximity neighbours (both directions), nearest first.
+        var neighbours = new Dictionary<string, List<(string tok, int m)>>(StringComparer.Ordinal);
+        void Add(string a, string b, int m)
+        {
+            if (!memberTokens.Contains(a) || !memberTokens.Contains(b)) return;
+            if (!neighbours.TryGetValue(a, out var l)) neighbours[a] = l = new List<(string, int)>();
+            l.Add((b, m));
+        }
+        foreach (var e in allEdges) { Add(e.FromToken, e.ToToken, e.Meters); Add(e.ToToken, e.FromToken, e.Meters); }
+
+        foreach (var f in members)
+        {
+            if (!neighbours.TryGetValue(f.Token, out var nbrs) || nbrs.Count == 0) continue; // no repair possible
+            int here = pieceOf[f.Token];
+            if (nbrs.Any(n => pieceOf.TryGetValue(n.tok, out var p) && p == here)) continue; // not an orphan
+            var nearest = nbrs.OrderBy(n => n.m).First(n => pieceOf.ContainsKey(n.tok));
+            int dest = pieceOf[nearest.tok];
+            pieces[here].Remove(f);
+            pieces[dest].Add(f);
+            pieceOf[f.Token] = dest;
         }
     }
 
@@ -257,7 +321,7 @@ internal static class Chunker
         sb.Append("  between. **Not to scale.** **Ways out** are the only routes to other areas.\n\n");
 
         AppendBounds(sb, c.Bounds);
-        AppendLocalTerrain(sb, m.Terrain, c.Bounds);
+        AppendLocalTerrain(sb, m.Terrain, c.Bounds, opts.MinTerrainAreaM2);
 
         // Features + intra-chunk connections.
         var inChunk = new HashSet<string>(c.Tokens, StringComparer.Ordinal);
@@ -331,15 +395,15 @@ internal static class Chunker
           .Append(F(b[3])).Append(" N,").Append(F(b[2])).Append(" E · **North is up.**\n\n");
     }
 
-    private static void AppendLocalTerrain(StringBuilder sb, List<TerrainEntry> terrain, double[] bounds)
+    private static void AppendLocalTerrain(StringBuilder sb, List<TerrainEntry> terrain, double[] bounds, double minAreaM2)
     {
         if (terrain.Count == 0 || bounds is not { Length: 4 }) return;
-        var local = terrain.Where(t => TerrainTouches(t, bounds)).ToList();
+        // Local to the chunk AND orienting-scale (ADR-0017): pocket parks are dropped from the text.
+        var local = terrain.Where(t => TerrainTouches(t, bounds)
+                                    && MapGenerator.TerrainShownInMarkdown(t, minAreaM2)).ToList();
         if (local.Count == 0) return;
         sb.Append("## Terrain & barriers\n\n");
-        foreach (var e in local)
-            sb.Append("- ").Append(e.Name).Append(" (").Append(e.KindLabel).Append(") · ")
-              .Append(e.Position).Append(" · ").Append(e.Note).Append('\n');
+        foreach (var e in local) sb.Append("- ").Append(MapGenerator.TerrainLine(e)).Append('\n');
         sb.Append('\n');
     }
 

@@ -279,6 +279,7 @@ public sealed class OsmNormalizer
                 Category = c.Category,
                 Importance = c.Importance,
                 Tier = c.Tier,
+                Salience = c.Salience,
                 Street = street,
                 StreetApprox = street is not null && approx ? true : (bool?)null,
             },

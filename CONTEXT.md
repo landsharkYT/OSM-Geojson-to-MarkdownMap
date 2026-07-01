@@ -36,11 +36,38 @@ markdown text (it survives in the [[explorer-react-helper|Explorer]] detail view
 densest section terse.
 
 ### Importance Tier
-A rank assigned to each Feature that decides whether it is **Promoted** (shown as its
-own Token) or **Clustered** (folded into a District). v1 default: landmarks/amenities/
-shops/civic rank above named buildings, which rank above minor/unnamed structures.
-The ranking is a **tunable default, never hardcoded** — exposed as user settings after
-the first prototype.
+A numeric rank (0–100) assigned to each Feature. It **orders** Features but no longer *alone*
+decides promotion: promote-vs-cluster is governed by [[narrative-salience]] (a guaranteed **core**
+promotes; the rest compete) plus the per-District [[promotion-budget]]. v1 default:
+landmarks/amenities/shops/civic rank above named buildings, above minor/unnamed structures. A
+**tunable default, never hardcoded**.
+
+### Narrative salience
+The parse-time classification of how **scene-worthy** a Feature is — distinct from raw
+[[importance-tier|importance]]. Set in the [[normalizer-stage-1|Normalizer]] from OSM tags, it sorts
+Features into: a **core** that always promotes (worship, civic **institutions** — school, library,
+hospital, post office, university building — historic sites, major venues); **budgeted** competitors
+(artwork, food, shops, private services like a dentist or salon) that vie for the
+[[promotion-budget]]; and **clustered** (residential/minor). Fixes the dense-extract failure where a
+private dental office ranked like a school and dozens of campus sculptures all promoted.
+**Model-affecting** (changes which Features get a [[token]]), so **not** a render-only
+[[markdownmap-settings|setting]]. See ADR-0018.
+
+### Chain flag
+A Normalizer flag: a Feature carrying a `brand` tag is a **chain** (a franchise coffee shop or
+retail chain). It
+**lowers** the Feature's [[importance-tier|importance]] so **independent** places win the
+[[promotion-budget]] first — a chain still promotes where there's headroom (a lone café in a sparse
+block) and fades out exactly where density is high. Corrects the prior rule where a resolved brand
+name *raised* rank. See ADR-0018.
+
+### Promotion budget
+A per-[[district-cluster|District]] cap (Stage 2) on how many **budgeted** Features earn their own
+[[token]] beyond the guaranteed [[narrative-salience|salience core]]: the top-K by
+[[importance-tier|importance]] promote, the rest fold into the District's clustered count.
+Self-adapting — a dense retail District clusters most of its long tail while a sparse one promotes
+nearly all — so a hyper-dense extract and a modest one come out comparably legible without per-city
+tuning. K a tunable default. Model-affecting. See ADR-0018.
 
 ### Name resolution
 How a Feature gets its display name. The Normalizer (Stage 1, the only stage with raw OSM
@@ -68,7 +95,9 @@ same-category guard so distinct neighbours are never merged. See ADR-0012.
 Unnamed Features promote to their own Token only at **landmark tier**; unnamed
 destination/lower Features are demoted to a District's clustered count. A fixed default (not a
 toggle — it is model-affecting, unlike the render-only [[markdownmap-settings]]). Keeps the
-notable unnamed church while folding unnamed noise away. See ADR-0012.
+notable unnamed church while folding unnamed noise away. Composes with [[narrative-salience]]: an
+unnamed non-core Feature has low [[importance-tier|importance]], so it rarely wins the
+[[promotion-budget]] and clusters anyway. See ADR-0012 and ADR-0018.
 
 ### District (Cluster)
 A named group of lower-tier Features shown as a single block instead of individual
@@ -112,9 +141,10 @@ deliberately. Routes are the *long-range, cross-District* connective tissue the 
 graph cannot express, and make travel time **mode-dependent** (walk vs bus vs rail).
 
 ### Anchor
-The focal Feature a [[chunking|chunk]] is oriented on — its **key feature** (the District's spine head).
-Fixed per chunk, giving a static chunk set; the party's *exact* spot is the consumer's to
-narrate. Intrinsic to chunked maps; absent (or user-stated) in whole-area maps. See ADR-0016.
+The focal Feature a [[chunking|chunk]] is oriented on — its **key feature** (the most important
+Feature in the chunk). Fixed per chunk, giving a static chunk set; the party's *exact* spot is the
+consumer's to narrate. Intrinsic to chunked maps; absent (or user-stated) in whole-area maps. Also
+the **fallback label** for a [[chunking|sub-area]] whose octant name would collide. See ADR-0016.
 
 ### Off-map edge
 A concrete exit on a [[chunking|chunk]]'s boundary pointing toward the neighbour that continues beyond it:
@@ -127,12 +157,17 @@ per neighbour chunk. See ADR-0016.
 An opt-in [[markdownmap-settings|generation setting]] (ADR-0016) that renders the map as a set of
 self-contained **scene-chunks** instead of one document, for a storytelling LLM that loads **one
 chunk at a time** (retrieval) — sharp local focus, cheap per turn. A **chunk** = a
-[[district-cluster|District]] (spine-split into contiguous segments when it exceeds the
-[[scene-size]] target), oriented on its [[anchor]], carrying a compact reading key, local terrain,
-its features + connections, and concrete [[off-map-edge|off-map exits]]. Tokens are **global and
-stable** across all chunks so references stay coherent as the party moves. Render-only over the
-MapModel (no re-parse, ADR-0011), but the output shape becomes a chunk set + [[manifest]]. Distinct
-from whole-area mode (the default). See ADR-0016.
+[[district-cluster|District]], or one **sub-area** of a District too big for the [[scene-size]]
+target. A District is subdivided into contiguous, **non-overlapping** sub-areas by **density-gap
+bisection** — recursively cutting at the widest gap along the longer (cardinal) axis until each
+piece fits, so cuts fall in sparse seams (real exits, no sliced blocks) and a stray feature left
+without an in-piece neighbour is merged back to its nearest one. Sub-areas are named
+`District · <octant>` (with the [[anchor]] key-feature as fallback on collision). Each chunk is
+oriented on its [[anchor]], carrying a compact [[reading-key]], local terrain, its features +
+connections, and concrete [[off-map-edge|off-map exits]]. Tokens are **global and stable** across
+all chunks so references stay coherent as the party moves. Render-only over the MapModel (no
+re-parse, ADR-0011), but the output shape becomes a chunk set + [[manifest]]. Distinct from
+whole-area mode (the default). See ADR-0016 and ADR-0017 (subdivision).
 
 ### Manifest
 The index emitted alongside a [[chunking|chunked]] map: one row per chunk — name · file · bbox ·
@@ -141,9 +176,9 @@ reading them all. Shipped as `manifest.md` in the download zip. See ADR-0016.
 
 ### Scene size
 The [[chunking]] control: **Tight / Standard / Wide** (≈ 8 / 14 / 22 promoted Features per
-chunk, Standard default). Sets the target a District may reach before it spine-splits — i.e. how
-much world a single scene shows. Measured in promoted Features (clustered minors are cheap). See
-ADR-0016.
+chunk, Standard default). Sets the size a District may reach before it **subdivides** into
+sub-areas — i.e. how much world a single scene shows. Measured in promoted Features (clustered
+minors are cheap). See ADR-0016.
 
 ### Source (acquisition)
 Where raw map data comes from: a **static OSM export file** (`.osm`/`.pbf`) the user
@@ -257,9 +292,14 @@ frame so it need not triangulate per-Feature bearings.
 ### Terrain
 The orienting context block: named water bodies, parks, and Barriers with their rough
 position, so the LLM knows "the shape of the place" (what's water, what blocks movement).
-The **markdown** projection is deliberately **coarse — name · octant · note** — and stays that
+The **markdown** projection is deliberately **coarse — name · octant** — and stays that
 way: real geometry (ADR-0014 ring assembly) flows into the contract + Explorer SVG, never into
-the markdown text, where coordinate detail would only bloat tokens and degrade LLM reasoning.
+the markdown text, where coordinate detail would only bloat tokens and degrade LLM reasoning. For
+the same reason the markdown lists only **orienting-scale** terrain: parks/water below an **area
+threshold** are omitted from the *text* (their geometry still reaches the contract + Explorer), so
+a park-dense extract doesn't drown the block in pocket parks; and the redundant per-line note
+(`green space` / `open water`) is dropped — the kind label already says it — while the barrier note
+(`impassable except at crossings`) stays, since it carries real information.
 
 ### Topology (connectivity)
 OSM encodes the street/path **graph** via shared node IDs (a node in two ways = an
@@ -286,4 +326,5 @@ The contract is a **mixed-geometry** FeatureCollection, not point-only.
 The Stage 1 rule for what becomes a Feature at all (distinct from promote-vs-cluster).
 RP-noise — parking, benches, bicycle parking, waste baskets, trees — is **dropped
 entirely**, not clustered. Unnamed buildings survive only as a per-District clustered
-count. See `docs/feature-schema.md` §3.
+count. Passing the gate makes a Feature; whether it earns a [[token]] is then a separate call by
+[[narrative-salience]] + the [[promotion-budget]]. See `docs/feature-schema.md` §3.

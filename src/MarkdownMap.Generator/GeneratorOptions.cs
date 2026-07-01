@@ -29,6 +29,12 @@ public sealed class GeneratorOptions
     /// <summary>Max key features listed on a district spine (skeleton, not full membership).</summary>
     public int SpineKeyCap { get; set; } = 8;
 
+    /// <summary>
+    /// Per-District promotion budget (ADR-0018): how many **budgeted** features earn their own token
+    /// beyond the always-promoted salience core; the rest fold into the clustered count. Model-affecting.
+    /// </summary>
+    public int PromotionBudget { get; set; } = 20;
+
     /// <summary>Print the neighbour's name on each connection line (`connections.inlineNeighborName`).</summary>
     public bool InlineNeighborName { get; set; } = true;
 
@@ -42,10 +48,17 @@ public sealed class GeneratorOptions
     public bool Chunking { get; set; } = false;
 
     /// <summary>
-    /// Target promoted-feature count per scene-chunk (ADR-0016). A District over this size splits
-    /// along its spine. Tight ≈ 8 · Standard ≈ 14 · Wide ≈ 22.
+    /// Target promoted-feature count per scene-chunk (ADR-0016). A District over this size is
+    /// subdivided by density-gap bisection (ADR-0017). Tight ≈ 8 · Standard ≈ 14 · Wide ≈ 22.
     /// </summary>
     public int SceneSize { get; set; } = 14;
+
+    /// <summary>
+    /// Minimum area (m²) for a park/water polygon to be listed in the **markdown** terrain block
+    /// (ADR-0017). Smaller ones (pocket parks, street-ends) are dropped from the text only — their
+    /// geometry still reaches the contract + Explorer. Barriers and linear shorelines are unaffected.
+    /// </summary>
+    public double MinTerrainAreaM2 { get; set; } = 5000;
 
     public BucketCutoffs Buckets { get; set; } = BucketCutoffs.Default;
 

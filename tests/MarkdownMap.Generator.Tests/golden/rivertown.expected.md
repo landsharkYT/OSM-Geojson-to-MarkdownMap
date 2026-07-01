@@ -21,8 +21,8 @@ here; if something is not on the map, it is unknown — say so rather than guess
 
 ## Terrain & barriers
 
-- Mill Lake (water) · W · open water
-- Riverside Park (park) · N · green space
+- Mill Lake (water) · W edge
+- Riverside Park (park) · N edge
 - Route 9 (barrier:motorway) · runs N–S, E · impassable except at crossings
 
 ## Districts

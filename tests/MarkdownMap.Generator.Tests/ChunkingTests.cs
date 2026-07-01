@@ -124,9 +124,9 @@ public class ChunkingTests
     }
 
     [Fact]
-    public void A_large_district_splits_along_its_spine()
+    public void A_large_district_subdivides_into_octant_named_pieces()
     {
-        // One district, 6 POIs strung north–south, scene size 3 → two contiguous segments.
+        // One district, 6 POIs strung north–south, scene size 3 → two pieces at the mid gap (ADR-0017).
         var feats = new System.Collections.Generic.List<Feature> { Place("Spine City", 0, 0) };
         for (int i = 0; i < 6; i++) feats.Add(Poi("F" + i, 0.0, -0.003 + i * 0.001, 90 - i));
         var fc = new FeatureCollection
@@ -137,13 +137,44 @@ public class ChunkingTests
 
         var m = new MapGenerator(Chunked(sceneSize: 3)).BuildModel(fc);
         Assert.Equal(2, m.Chunks.Count);
-        // Segments are suffixed by compass position of the segment within the district (N / S).
+        // Named `District · <octant>` — and for an N–S split that means the poles N and S.
         Assert.All(m.Chunks, c => Assert.StartsWith("Spine City · ", c.Name));
-        // Contiguous, non-overlapping partition of all six tokens.
+        Assert.Contains(m.Chunks, c => c.Name == "Spine City · N");
+        Assert.Contains(m.Chunks, c => c.Name == "Spine City · S");
+        // Complete, disjoint partition of all six tokens; distinct file slugs.
         var tokens = m.Chunks.SelectMany(c => c.Tokens).ToList();
         Assert.Equal(6, tokens.Distinct().Count());
-        // Distinct file slugs.
         Assert.Equal(2, m.Chunks.Select(c => c.Slug).Distinct().Count());
+        // Bounds don't overlap in latitude (the split axis).
+        var byLat = m.Chunks.OrderBy(c => c.Bounds[1]).ToList();
+        Assert.True(byLat[0].Bounds[3] <= byLat[1].Bounds[1] + 1e-9, "piece bboxes overlap on the split axis");
+    }
+
+    [Fact]
+    public void Subdivision_leaves_no_orphaned_feature()
+    {
+        // A connected 5×5 grid in one District, subdivided small: every feature must keep at least
+        // one in-chunk proximity neighbour (orphan repair, ADR-0017).
+        var feats = new System.Collections.Generic.List<Feature> { Place("Grid City", 0.001, 0.001) };
+        int n = 0;
+        for (int r = 0; r < 5; r++)
+            for (int col = 0; col < 5; col++)
+                feats.Add(Poi("G" + n++, col * 0.0006, r * 0.0006, 50 + r * 5 + col));
+        var fc = new FeatureCollection
+        {
+            Properties = new CollectionProperties { Title = "Gridtown", Bounds = new[] { -0.01, -0.01, 0.01, 0.01 } },
+            Features = feats,
+        };
+
+        var m = new MapGenerator(Chunked(sceneSize: 8)).BuildModel(fc);
+        Assert.True(m.Chunks.Count >= 3, "grid should subdivide into several pieces");
+        foreach (var c in m.Chunks)
+        {
+            var inChunk = new System.Collections.Generic.HashSet<string>(c.Tokens);
+            foreach (var t in c.Tokens)
+                Assert.True(m.Edges.Any(e => e.FromToken == t && inChunk.Contains(e.ToToken)),
+                    $"{t} is orphaned in chunk {c.Name}");
+        }
     }
 
     [Fact]
