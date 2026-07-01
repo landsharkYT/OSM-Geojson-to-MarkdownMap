@@ -14,7 +14,7 @@ export interface MarkdownMapSettings {
 
 export const DEFAULT_SETTINGS: MarkdownMapSettings = {
   bidirectional: false,
-  inlineNeighborName: true,
+  inlineNeighborName: false,
   directivePreamble: true,
   chunking: false,
   sceneSize: 'standard',

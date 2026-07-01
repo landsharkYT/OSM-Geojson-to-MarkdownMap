@@ -76,8 +76,8 @@ Top-level class drives base importance. Subclass = the OSM value (passed through
 ## 5. Importance & promotion (v1 default — tunable)
 
 ```
-base   = { landmark:80, civic-institution:80, civic-private:60,
-           food|shop|leisure|lodging:55, residential:30 }[category]
+base   = { core-landmark:80, civic-institution:80, civic-private:60,
+           food|shop|leisure|lodging:55, commemorative-landmark:45, residential:30 }[category]
 score  = base
        + (resolvedName != null ? 10 : 0)   // name|brand|operator (ADR-0012)
        + (class==landmark      ?  5 : 0)
@@ -87,14 +87,19 @@ score  = clamp(score, 0, 100)
 tier   = score>=75 ? landmark : score>=50 ? destination : score>=25 ? minor : structure
 ```
 
+`commemorative-landmark` = the budgeted landmark subclasses (artwork, viewpoint, memorial, monument);
+base 45 keeps them **below interactive venues** (food/shops ≈ 65 with a name) so a district's cafés
+and shops win the budget before its sculptures (a DM's party enters buildings, walks past art).
+
 **Narrative salience (ADR-0018)** — computed from the `category` (see `SalienceClassifier`), decides
 promotion; `tier`/`importance` only *order* features:
 - **core** — worship, civic **institutions** (school, library, hospital, post office, university,
-  townhall, police, fire station), historic, museum/gallery/attraction/monument, major leisure
-  venues (marina, stadium, sports centre, golf course) → always **Promoted**.
-- **budgeted** — artwork, viewpoint, food, shops, **private** civic (dentist, clinic, pharmacy,
-  doctors, veterinary), small leisure, lodging → **Promoted** only if it wins the per-District
-  **promotion budget** (top-K by importance); the rest **Clustered**.
+  townhall, police, fire station), historic, museum/gallery/attraction, major leisure venues (marina,
+  stadium, sports centre, golf course) → always **Promoted**.
+- **budgeted** — **commemorative** landmarks (artwork, viewpoint, memorial, monument, base 45),
+  food, shops, **private** civic (dentist, clinic, pharmacy, doctors, veterinary), small leisure,
+  lodging → **Promoted** only if it wins the per-District **promotion budget** (top-K by importance);
+  the rest **Clustered**. Venues outrank commemoratives within the budget.
 - **clustered** — residential (and `minor`/`structure` tiers) → count only.
 - **Tiered unnamed promotion (ADR-0012):** an unnamed feature is promoted only when its salience is
   **core**; unnamed budgeted features cluster (never compete), so nameless noise never gets a token.

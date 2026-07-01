@@ -59,12 +59,17 @@ public class ClassifierTests
     }
 
     [Fact]
-    public void Artwork_gets_landmark_bonus()
+    public void Artwork_is_a_budgeted_commemorative_below_venues()
     {
-        var c = Classifier.Classify(Tags("tourism", "artwork", "name", "Mural"));
-        Assert.Equal("landmark.artwork", c!.Category);
-        Assert.Equal(95, c.Importance); // 80 + 10 + 5
-        Assert.Equal("landmark", c.Tier);
+        // Public art is "walk-past" commemorative: budgeted, and scored below interactive venues so a
+        // district's cafés/shops win the budget before its sculptures (ADR-0018).
+        var art = Classifier.Classify(Tags("tourism", "artwork", "name", "Mural"))!;
+        Assert.Equal("landmark.artwork", art.Category);
+        Assert.Equal("budgeted", art.Salience);
+        Assert.Equal(60, art.Importance); // 45 base + 10 name + 5 landmark
+
+        var cafe = Classifier.Classify(Tags("amenity", "cafe", "name", "Indie"))!;
+        Assert.True(art.Importance < cafe.Importance, $"art {art.Importance} !< cafe {cafe.Importance}");
     }
 
     [Fact]

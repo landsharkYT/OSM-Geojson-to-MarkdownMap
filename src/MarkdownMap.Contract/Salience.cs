@@ -19,10 +19,11 @@ public static class SalienceClassifier
     private static readonly HashSet<string> PrivateCivic = new(StringComparer.Ordinal)
     { "dentist", "clinic", "pharmacy", "doctors", "veterinary" };
 
-    // Crowd-able landmark subclasses (public art, viewpoints) → budgeted; the rest (worship,
-    // historic, museum, gallery, attraction, monument) → core.
+    // Commemorative / decorative landmarks (public art, viewpoints, memorials, monuments) proliferate
+    // and are "walk-past" set-dressing → budgeted; the rest (worship, historic, museum, gallery,
+    // attraction) are destinations you enter → core (ADR-0018).
     private static readonly HashSet<string> BudgetedLandmark = new(StringComparer.Ordinal)
-    { "artwork", "viewpoint" };
+    { "artwork", "viewpoint", "memorial", "monument" };
 
     // Sizeable leisure venues → core; small facilities (gym, playground, pitch…) → budgeted.
     private static readonly HashSet<string> CoreLeisure = new(StringComparer.Ordinal)

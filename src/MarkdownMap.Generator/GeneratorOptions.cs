@@ -35,8 +35,10 @@ public sealed class GeneratorOptions
     /// </summary>
     public int PromotionBudget { get; set; } = 20;
 
-    /// <summary>Print the neighbour's name on each connection line (`connections.inlineNeighborName`).</summary>
-    public bool InlineNeighborName { get; set; } = true;
+    /// <summary>Print the neighbour's name on each connection line (`connections.inlineNeighborName`).
+    /// Default off: a connection references its neighbour by token; the name is one lookup away in the
+    /// feature header, so repeating it on every arrow is the second-largest redundancy (grill 2026-07-01).</summary>
+    public bool InlineNeighborName { get; set; } = false;
 
     /// <summary>Emit the LLM framing block (`render.directivePreamble`).</summary>
     public bool DirectivePreamble { get; set; } = true;

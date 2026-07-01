@@ -193,6 +193,16 @@ test('the sidebar can be resized by dragging its left edge', async ({ page }) =>
   expect((await aside.boundingBox())!.width).toBeLessThan(after - 40)
 })
 
+test('the Restart button clears the map and returns to the drop zone', async ({ page }) => {
+  await page.goto('/')
+  await page.setInputFiles('input[type="file"]', fixture)
+  await expect(page.locator('main svg').getByText('[01]', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: /Restart/ }).click()
+  await expect(page.getByText(/Drop a/)).toBeVisible()          // back to the drop zone
+  await expect(page.getByRole('button', { name: /Restart/ })).toBeHidden() // button gone with no map
+})
+
 test('clicking a token shows its details', async ({ page }) => {
   await page.goto('/')
   await page.setInputFiles('input[type="file"]', fixture)

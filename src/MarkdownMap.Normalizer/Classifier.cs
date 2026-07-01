@@ -78,11 +78,18 @@ public static class Classifier
         string category = $"{klass}.{subclass}";
         string salience = SalienceClassifier.Of(category);
 
+        // Commemorative/decorative landmarks (art, viewpoint, memorial, monument) rank BELOW
+        // interactive venues so a district's cafés and shops win the budget before its sculptures
+        // (ADR-0018): drop their base well under the commodity base of 55.
+        int baseScore = klass == "landmark" && salience == SalienceClassifier.Budgeted
+            ? 45
+            : BaseScore(klass, subclass);
+
         // Chain penalty (ADR-0018): a `brand`-tagged Feature is a chain, so it loses the promotion
         // budget to independents. The penalty exceeds the name bonus, netting a chain below an
         // equivalent independent while still keeping it above the clustered floor.
         bool isChain = tags.ContainsKey("brand") || tags.ContainsKey("brand:wikidata");
-        int score = BaseScore(klass, subclass)
+        int score = baseScore
                     + (hasName ? 10 : 0)
                     + (klass == "landmark" ? 5 : 0)
                     - (isChain ? 15 : 0);

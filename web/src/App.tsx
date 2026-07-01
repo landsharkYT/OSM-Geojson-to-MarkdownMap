@@ -36,6 +36,15 @@ export default function App() {
 
   const loading = progress !== null
 
+  // Clear the loaded map and return to the drop zone to parse something else.
+  function restart() {
+    if (loading) return
+    setModel(null)
+    setSelected(null)
+    setHighlight(null)
+    setError(null)
+  }
+
   async function load(file: File) {
     if (loading) return // one build at a time (persistent worker, ADR-0010)
     setError(null)
@@ -94,12 +103,6 @@ export default function App() {
     >
       <header className="flex items-center gap-4 border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-900">
         <h1 className="text-lg font-semibold">OSM → MarkdownMap Explorer</h1>
-        <button
-          onClick={() => fileInput.current?.click()}
-          className="rounded bg-sky-600 px-3 py-1 text-sm text-white hover:bg-sky-700"
-        >
-          Open .osm / .geojson
-        </button>
         <input
           ref={fileInput}
           type="file"
@@ -107,6 +110,16 @@ export default function App() {
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) load(f); e.target.value = '' }}
         />
+        {model && (
+          <button
+            onClick={restart}
+            disabled={loading}
+            title="Parse a different file"
+            className="rounded bg-sky-600 px-3 py-1 text-sm text-white hover:bg-sky-700 disabled:opacity-50"
+          >
+            ↻ Restart
+          </button>
+        )}
         {model && <span className="text-sm text-slate-500">{model.title}</span>}
 
         <div className="ml-auto flex items-center gap-3">
@@ -179,10 +192,14 @@ export default function App() {
             {progress ? (
               <ProgressCard progress={progress} />
             ) : (
-              <div className={`rounded-2xl border-2 border-dashed p-12 text-center ${dragging ? 'border-sky-500 bg-sky-50 dark:bg-sky-950' : 'border-slate-300 dark:border-slate-700'}`}>
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                className={`cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${dragging ? 'border-sky-500 bg-sky-50 dark:bg-sky-950' : 'border-slate-300 hover:border-sky-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:border-sky-500 dark:hover:bg-slate-800/50'}`}
+              >
                 <p className="text-lg font-medium">Drop a <code>.osm</code> or <code>.geojson</code> here</p>
-                <p className="mt-1 text-sm text-slate-500">or use “Open” above.</p>
-              </div>
+                <p className="mt-1 text-sm text-slate-500">or click to browse.</p>
+              </button>
             )}
           </div>
         )}

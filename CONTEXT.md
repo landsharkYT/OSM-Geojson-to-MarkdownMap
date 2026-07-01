@@ -46,12 +46,14 @@ landmarks/amenities/shops/civic rank above named buildings, above minor/unnamed 
 The parse-time classification of how **scene-worthy** a Feature is — distinct from raw
 [[importance-tier|importance]]. Set in the [[normalizer-stage-1|Normalizer]] from OSM tags, it sorts
 Features into: a **core** that always promotes (worship, civic **institutions** — school, library,
-hospital, post office, university building — historic sites, major venues); **budgeted** competitors
-(artwork, food, shops, private services like a dentist or salon) that vie for the
-[[promotion-budget]]; and **clustered** (residential/minor). Fixes the dense-extract failure where a
-private dental office ranked like a school and dozens of campus sculptures all promoted.
-**Model-affecting** (changes which Features get a [[token]]), so **not** a render-only
-[[markdownmap-settings|setting]]. See ADR-0018.
+hospital, post office, university building — historic sites, museums/galleries/attractions, major
+venues); **budgeted** competitors that vie for the [[promotion-budget]]; and **clustered**
+(residential/minor). Within *budgeted*, **interactive venues** (food, shops, private services like a
+dentist or salon) outrank **commemorative/decorative** landmarks (artwork, viewpoint, memorial,
+monument) — so a district's cafés and shops win seats before its sculptures, since a DM's party
+enters buildings and only walks past art. Fixes the dense-extract failures where a private dental
+office ranked like a school and campus sculptures crowded out venues. **Model-affecting** (changes
+which Features get a [[token]]), so **not** a render-only [[markdownmap-settings|setting]]. See ADR-0018.
 
 ### Chain flag
 A Normalizer flag: a Feature carrying a `brand` tag is a **chain** (a franchise coffee shop or
@@ -203,9 +205,11 @@ via a settings button on the MarkdownMap panel. v1 surfaces the **render-only** 
 emitted, never a knob), plus [[chunking]] + [[scene-size]]. These change only the rendered
 markdown, never the **MapModel**, so a change re-renders the cached model instantly with no
 re-parse (ADR-0011). Live + persisted. **Distinct from [[layer toggles]]**, which only affect the
-SVG view. Model-affecting knobs (`neighborsPerFeature`, `buckets`) are deferred. `bidirectional`
-now defaults **off** (each link once; the reverse direction is inferable) — the terser default,
-since the redundant both-ways listing is the single largest cost in the connections block.
+SVG view. Model-affecting knobs (`neighborsPerFeature`, `buckets`) are deferred. Both terser
+knobs now default **off**: `bidirectional` (each link once; the reverse is inferable) and
+`inlineNeighborName` (a connection references its neighbour by **[[token]]** only — the name is one
+lookup away in the feature header, and the [[reading-key]] documents that nameless form), together
+the two largest redundancies in the connections block.
 
 ### Rendered preview
 A **display-only** sidebar toggle (default **off**) that shows the MarkdownMap as formatted

@@ -346,9 +346,9 @@ public sealed class MapGenerator
         sb.Append("## How to read\n\n");
         sb.Append("- `[token] Name (category)`");
         sb.Append(hasDistricts ? " optionally `· on <street> · <district>`.\n" : ".\n");
-        sb.Append("- `→ [token] Name — ~<m>m <DIR>`: the named feature lies ~<m> metres away, compass\n");
-        sb.Append("  `<DIR>` (N = up; 8-wind). Straight-line closeness, **not to scale** — only the numbers\n");
-        sb.Append("  and letters are real.\n");
+        sb.Append("- `→ [token] — ~<m>m <DIR>`: the linked feature (look up its token above) lies ~<m>\n");
+        sb.Append("  metres away, compass `<DIR>` (N = up; 8-wind). Straight-line closeness, **not to scale**\n");
+        sb.Append("  — only the numbers and letters are real.\n");
         if (hasTerrain)
             sb.Append("- Flags: `[crosses <road>]` a road/rail lies between (cross at a crossing); `[separated by\n  water]` open water lies between (not directly walkable); `stands apart` reached only across water.\n");
         if (hasDistricts)

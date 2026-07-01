@@ -10,9 +10,9 @@ here; if something is not on the map, it is unknown — say so rather than guess
 ## How to read
 
 - `[token] Name (category)` optionally `· on <street> · <district>`.
-- `→ [token] Name — ~<m>m <DIR>`: the named feature lies ~<m> metres away, compass
-  `<DIR>` (N = up; 8-wind). Straight-line closeness, **not to scale** — only the numbers
-  and letters are real.
+- `→ [token] — ~<m>m <DIR>`: the linked feature (look up its token above) lies ~<m>
+  metres away, compass `<DIR>` (N = up; 8-wind). Straight-line closeness, **not to scale**
+  — only the numbers and letters are real.
 - Flags: `[crosses <road>]` a road/rail lies between (cross at a crossing); `[separated by
   water]` open water lies between (not directly walkable); `stands apart` reached only across water.
 - `spine:` orders a district along its axis; `clustered:` counts minor features not listed.
@@ -41,42 +41,42 @@ clustered: ~2 minor
 
 ```
 [01] Founders Mural (landmark.artwork) · Old Town
-   → [02] The Old Mill — ~25m SE
-   → [03] Old Town Library — ~55m S
-   → [05] The Anchor Tavern — ~80m S
+   → [02] — ~25m SE
+   → [03] — ~55m S
+   → [05] — ~80m S
 
 [02] The Old Mill (landmark.attraction) · Old Town
-   → [03] Old Town Library — ~35m S
-   → [05] The Anchor Tavern — ~60m S
+   → [03] — ~35m S
+   → [05] — ~60m S
 
 [03] Old Town Library (civic.library) · Old Town
-   → [05] The Anchor Tavern — ~25m S
-   → [06] Bluebird Coffee — ~35m S
+   → [05] — ~25m S
+   → [06] — ~35m S
 
 [04] Riverside School (civic.school) · near 10th Street · Harborside
-   → [08] Rivertown Market — ~95m NW [crosses Route 9]
-   → [09] Mill Street Deli — ~95m NW [crosses Route 9]
-   → [10] Pino's Pizza — ~100m W [crosses Route 9]
+   → [08] — ~95m NW [crosses Route 9]
+   → [09] — ~95m NW [crosses Route 9]
+   → [10] — ~100m W [crosses Route 9]
 
 [05] The Anchor Tavern (food.bar) · Old Town
-   → [06] Bluebird Coffee — ~15m SE
-   → [07] Corner Cafe — ~25m S
+   → [06] — ~15m SE
+   → [07] — ~25m S
 
 [06] Bluebird Coffee (food.cafe) · Old Town
-   → [07] Corner Cafe — ~20m SW
-   → [08] Rivertown Market — ~20m S
+   → [07] — ~20m SW
+   → [08] — ~20m S
 
 [07] Corner Cafe (food.cafe) · Harborside
-   → [08] Rivertown Market — ~20m SE
-   → [09] Mill Street Deli — ~25m S
-   → [10] Pino's Pizza — ~35m S
+   → [08] — ~20m SE
+   → [09] — ~25m S
+   → [10] — ~35m S
 
 [08] Rivertown Market (shop.convenience) · Harborside
-   → [09] Mill Street Deli — ~15m SW
-   → [10] Pino's Pizza — ~25m SW
+   → [09] — ~15m SW
+   → [10] — ~25m SW
 
 [09] Mill Street Deli (food.deli) · Harborside
-   → [10] Pino's Pizza — ~15m SW
+   → [10] — ~15m SW
 
 [10] Pino's Pizza (food.restaurant) · Harborside
 ```
