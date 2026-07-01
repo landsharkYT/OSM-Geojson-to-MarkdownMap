@@ -6,6 +6,7 @@ import { computeBounds, makeProjection } from '../projection'
 import { visibleLabels, type LabelCandidate } from '../labelLayout'
 import { convexHull, type Point } from '../hull'
 import type { Layers } from '../mapViewSettings'
+import { terrainShownInMarkdown } from '../terrainVisibility'
 
 const W = 1000
 const H = 750
@@ -51,6 +52,9 @@ function hullAreaStyle(kind: string) {
 export function MapView({ model, selected, onSelect, layers, detailedTerrain, highlight }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [t, setT] = useState<ZoomTransform>(zoomIdentity)
+  // Minor-feature hover (its own affordance, separate from the token/sidebar selection): a minor
+  // has no token and never drives the sidebar — hovering just shows a tiny "what is this" tooltip.
+  const [hoverMinor, setHoverMinor] = useState<number | null>(null)
 
   const highlightSet = useMemo(
     () => (highlight && highlight.length ? new Set(highlight) : null),
@@ -123,7 +127,9 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain, hi
       {/* --- geometry layer: scales with zoom --- */}
       <g transform={`translate(${t.x},${t.y}) scale(${t.k})`}>
         {layers.terrain &&
-          model.terrain.flatMap((te, i) => {
+          // Only terrain the markdown lists — sub-threshold pocket parks are omitted from the text,
+          // so the map omits them too (honest about what the AI sees). Mirrors the Generator filter.
+          model.terrain.filter(terrainShownInMarkdown).flatMap((te, i) => {
             // Barriers are always lines, in both modes.
             if (te.kind === 'barrier')
               return te.parts.map((part, j) => (
@@ -186,7 +192,18 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain, hi
         {layers.minors &&
           model.minors.map((f, i) => {
             const [px, py] = proj.project(f.lon, f.lat)
-            return <circle key={`m${i}`} cx={sx(px)} cy={sy(py)} r={2} fill="#94a3b8" opacity={highlightSet ? 0.15 : 0.5} />
+            const x = sx(px), y = sy(py)
+            const hov = hoverMinor === i
+            return (
+              <g key={`m${i}`}>
+                <circle cx={x} cy={y} r={hov ? 3.5 : 2} fill={hov ? '#cbd5e1' : '#94a3b8'}
+                  opacity={highlightSet ? 0.15 : hov ? 0.95 : 0.5} />
+                {/* transparent hit target — the 2px dot is too small to land on directly */}
+                <circle cx={x} cy={y} r={5} fill="transparent" className="cursor-help"
+                  onMouseEnter={() => setHoverMinor(i)}
+                  onMouseLeave={() => setHoverMinor((h) => (h === i ? null : h))} />
+              </g>
+            )
           })}
 
         {/* crossing markers: a red ✕ on the selected feature's links that cross a barrier
@@ -231,6 +248,23 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain, hi
               </g>
             )
           })}
+
+        {/* minor-feature hover tooltip — drawn last so it sits on top; just says what it is */}
+        {layers.minors && hoverMinor != null && model.minors[hoverMinor] && (() => {
+          const f = model.minors[hoverMinor]
+          const [px, py] = proj.project(f.lon, f.lat)
+          const x = sx(px), y = sy(py)
+          const w = Math.max(f.name.length, f.category.length) * 6 + 12
+          const flip = x + 10 + w > W // keep it on-canvas near the right edge
+          const tx = flip ? x - 10 - w : x + 10
+          return (
+            <g pointerEvents="none" transform={`translate(${tx},${y})`}>
+              <rect x={0} y={-16} width={w} height={30} rx={4} fill="rgba(15,23,42,0.92)" stroke="#334155" />
+              <text x={6} y={-3} fontSize={10} fill="#e2e8f0">{f.name}</text>
+              <text x={6} y={9} fontSize={9} fill="#94a3b8">{f.category}</text>
+            </g>
+          )
+        })()}
       </g>
     </svg>
   )

@@ -49,15 +49,30 @@ export function MapViewSettingsPopover({ value, onChange, onClose }: Props) {
 
       <div className="mt-1 border-t border-slate-100 pt-1 dark:border-slate-700">
         <p className="px-1 py-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Layers</p>
+        <p className="px-1 pb-1 text-xs text-slate-400 dark:text-slate-500">
+          By default the map shows only what the AI sees in the markdown.
+        </p>
         {(Object.keys(LAYER_LABELS) as (keyof Layers)[]).map((k) => (
-          <label key={k} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700/50">
+          <label key={k} className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700/50">
             <input
               type="checkbox"
-              className="accent-sky-600"
+              className="mt-0.5 accent-sky-600"
               checked={value.layers[k]}
               onChange={(e) => onChange({ ...value, layers: { ...value.layers, [k]: e.target.checked } })}
             />
-            {LAYER_LABELS[k]}
+            <span>
+              <span className="block">{LAYER_LABELS[k]}</span>
+              {k === 'minors' && (
+                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                  Not in the markdown. The AI only sees a count of these.{' '}
+                  {value.layers.minors && (
+                    <span className="font-medium text-amber-700 dark:text-amber-300">
+                      On: the map no longer represents the markdown.
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
           </label>
         ))}
       </div>

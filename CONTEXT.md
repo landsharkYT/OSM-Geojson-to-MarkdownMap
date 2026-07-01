@@ -237,6 +237,14 @@ OSM names are user data, so a place literally named `<img onerror=…>` must nev
 Checkboxes (Terrain / Edges / Minor features / Tokens) that show or hide **SVG** map layers in
 the human-facing view. A display concern only — they do **not** affect the generated
 MarkdownMap. Live behind the [[map-view-settings]] button. Distinct from [[markdownmap-settings]].
+**Honest-by-default:** the map shows only what the AI sees in the markdown — **Minor features**
+default **off** (they are *counted* in the markdown, never individually named, so plotting them makes
+the map show more than the text; a banner + popover note warn when they are revealed), and the Terrain
+layer draws only the **orienting-scale** areas the markdown lists (sub-threshold pocket parks are
+filtered out client-side, mirroring the Generator). The clustered/minor positions and full terrain
+geometry still reach the browser — the toggle only governs what is *drawn*. When Minor features are
+shown, each dot is **hover-inspectable** (a small tooltip names it and its category) — a look-only
+affordance, separate from the token/sidebar selection, since a minor has no [[token]].
 
 ### Map view settings
 The Explorer's **display-only** settings (ADR-0013), behind a ⚙ button in the header — separate

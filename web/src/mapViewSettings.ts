@@ -17,8 +17,12 @@ export interface MapViewSettings {
   detailedTerrain: boolean
 }
 
+// `minors` defaults OFF so the map is honest by default: it shows only what the AI sees in the
+// markdown (promoted tokens + orienting terrain). Minor/clustered features are counted in the
+// markdown, never individually named — plotting them makes the map show MORE than the text, so it is
+// opt-in behind a warning (App banner + popover note).
 export const DEFAULT_MAP_VIEW: MapViewSettings = {
-  layers: { terrain: true, edges: true, minors: true, tokens: true },
+  layers: { terrain: true, edges: true, minors: false, tokens: true },
   detailedTerrain: true,
 }
 

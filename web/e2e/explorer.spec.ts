@@ -236,3 +236,26 @@ test('map view settings toggle SVG layers (client-side, no rebuild)', async ({ p
   await expect(token).toBeHidden() // layer hidden purely in the SVG, no progress card
   await expect(page.getByText('Generating map', { exact: true })).toBeHidden()
 })
+
+test('the map is honest by default: minor features off, warning only when revealed', async ({ page }) => {
+  await page.goto('/')
+  await page.setInputFiles('input[type="file"]', fixture)
+  await expect(page.locator('main svg').getByText('[01]', { exact: true })).toBeVisible()
+
+  const warning = page.getByText('no longer matches the markdown', { exact: false })
+  await expect(warning).toBeHidden() // default view = what the AI sees; no surplus, no warning
+
+  await page.getByRole('button', { name: 'Map view settings' }).click()
+  const minors = page.getByRole('checkbox', { name: /Minor features/ })
+  await expect(minors).not.toBeChecked() // off by default
+  await minors.check()
+  await expect(warning).toBeVisible() // revealing the surplus warns the map ≠ markdown
+  await page.keyboard.press('Escape') // close the popover — real flow: user then sees the banner
+
+  await page.getByRole('button', { name: 'Dismiss warning' }).click()
+  await expect(warning).toBeHidden()
+
+  // Dismissing only hides the warning; the minor layer is still on.
+  await page.getByRole('button', { name: 'Map view settings' }).click()
+  await expect(page.getByRole('checkbox', { name: /Minor features/ })).toBeChecked()
+})

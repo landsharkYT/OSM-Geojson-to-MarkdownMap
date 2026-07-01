@@ -21,9 +21,12 @@ export default function App() {
   const [dragging, setDragging] = useState(false)
   const [legendOpen, setLegendOpen] = useState(false)
   const [mapSettingsOpen, setMapSettingsOpen] = useState(false)
+  const [minorsWarningDismissed, setMinorsWarningDismissed] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   function changeMapView(next: MapViewSettings) {
+    // Re-arm the warning each time minors are turned off, so re-enabling shows it again.
+    if (!next.layers.minors) setMinorsWarningDismissed(false)
     setMapView(next)
     saveMapView(next)
   }
@@ -159,7 +162,27 @@ export default function App() {
       <main className="relative flex min-h-0 flex-1">
         {model ? (
           <>
-            <div className="min-w-0 flex-1">
+            <div className="relative min-w-0 flex-1">
+              {mapView.layers.minors && !minorsWarningDismissed && (
+                <div
+                  role="status"
+                  className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center p-2"
+                >
+                  <span className="pointer-events-auto flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50/95 py-1.5 pl-3 pr-1.5 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-700 dark:bg-amber-950/90 dark:text-amber-200">
+                    <span>⚠ You’re showing minor features the AI can’t see. This map no longer matches the markdown.</span>
+                    <button
+                      type="button"
+                      aria-label="Dismiss warning"
+                      onClick={() => setMinorsWarningDismissed(true)}
+                      className="rounded p-0.5 text-amber-600 hover:bg-amber-200/60 hover:text-amber-900 dark:text-amber-400 dark:hover:bg-amber-800/60 dark:hover:text-amber-100"
+                    >
+                      <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                        <path d="M5 5l10 10M15 5L5 15" />
+                      </svg>
+                    </button>
+                  </span>
+                </div>
+              )}
               <MapView
                 model={model}
                 selected={selected}
