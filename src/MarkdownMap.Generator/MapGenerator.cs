@@ -324,6 +324,10 @@ public sealed class MapGenerator
     internal static bool IsCategoryFallbackName(string name, string category) =>
         name == Humanize(category);
 
+    // A connection at/over the far cutoff (default 500 m) is not a walkable scene-local hop — flag
+    // it `(far)` so a long proximity edge in a sparse area doesn't read like a nearby step (grill 2026-07-01).
+    internal static bool IsFarHop(int meters, BucketCutoffs c) => meters >= c.ShortWalk;
+
     // True when the feature sits on its district's dominant street (already named once at the
     // district/spine level), so the per-feature repeat can be dropped (grill 2026-06-30).
     private static bool IsDominantStreet(PromotedFeature f, Dictionary<string, string?> domStreet) =>
@@ -350,7 +354,7 @@ public sealed class MapGenerator
         sb.Append(hasDistricts ? " optionally `· on <street> · <district>`.\n" : ".\n");
         sb.Append("- `→ [token] — ~<m>m <DIR>`: the linked feature (look up its token above) lies ~<m>\n");
         sb.Append("  metres away, compass `<DIR>` (N = up; 8-wind). Straight-line closeness, **not to scale**\n");
-        sb.Append("  — only the numbers and letters are real.\n");
+        sb.Append("  — only the numbers and letters are real. `(far)` = ≥500 m, not a walkable local hop.\n");
         if (hasTerrain)
             sb.Append("- Flags: `[crosses <road>]` a road/rail lies between (cross at a crossing); `[separated by\n  water]` open water lies between (not directly walkable); `stands apart` reached only across water.\n");
         if (hasDistricts)
@@ -491,6 +495,7 @@ public sealed class MapGenerator
                     // Metres + bearing only; the size bucket is derivable and dropped (grill 2026-06-30).
                     sb.Append(" — ~").Append(e.Meters.ToString(CultureInfo.InvariantCulture)).Append("m ")
                       .Append(e.Dir);
+                    if (IsFarHop(e.Meters, _opts.Buckets)) sb.Append(" (far)");
                     if (e.SeparatedByWater) sb.Append(" [separated by water]");
                     if (e.Crosses is not null) sb.Append(" [crosses ").Append(e.Crosses).Append(']');
                     sb.Append('\n');

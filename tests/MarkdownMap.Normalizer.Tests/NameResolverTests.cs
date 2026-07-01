@@ -44,4 +44,19 @@ public class NameResolverTests
     [Fact]
     public void Ignores_blank_tag_values() =>
         Assert.Equal("Op", NameResolver.Resolve(Tags(("name", "   "), ("brand", ""), ("operator", "Op"))));
+
+    [Theory]
+    [InlineData("A")]       // dorm wing label
+    [InlineData("C")]
+    [InlineData("12")]      // building number as name
+    [InlineData("3")]
+    public void Bare_label_names_are_rejected_as_unnamed(string bare) =>
+        Assert.Null(NameResolver.Resolve(Tags(("name", bare))));
+
+    [Theory]
+    [InlineData("Elm Hall")]
+    [InlineData("Oak")]     // a real short word survives
+    [InlineData("A1 Bakery")]
+    public void Real_names_survive(string name) =>
+        Assert.Equal(name, NameResolver.Resolve(Tags(("name", name))));
 }

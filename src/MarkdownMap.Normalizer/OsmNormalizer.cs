@@ -115,7 +115,7 @@ public sealed class OsmNormalizer
         foreach (var (id, tags, nodes) in poiWays)
         {
             if (TryRepresentativePoint(nodes, nodeCoords, out var lon, out var lat))
-                features.Add(MakePoi("w" + id, tags, lon, lat, roads));
+                features.Add(MakePoi("w" + id, tags, lon, lat, roads, PolygonAreaM2(nodes, nodeCoords)));
         }
 
         foreach (var (id, name, lon, lat) in placeNodes)
@@ -264,11 +264,17 @@ public sealed class OsmNormalizer
 
     private static Feature MakePoi(
         string osmId, IReadOnlyDictionary<string, string> tags, double lon, double lat,
-        IReadOnlyList<Road> roads)
+        IReadOnlyList<Road> roads, double areaM2 = 0)
     {
         var c = Classifier.Classify(tags)!;
         var name = NameResolver.Resolve(tags); // name → brand → operator (ADR-0012)
         var (street, approx) = StreetSnapper.Assign(tags, (lon, lat), roads, StreetSnapRadiusMeters);
+        // Footprint-area nudge (ADR-0019): a campus's many lecture halls score identically, so the big
+        // halls out-sort the annexes within the promotion budget. Bounded to keep every budgeted
+        // building strictly below the core line (65 → ≤74). Only ways carry an area; nodes pass 0.
+        int importance = c.Importance;
+        if (areaM2 > 0 && SalienceClassifier.IsAreaRankedBuilding(c.Category))
+            importance = Math.Min(100, importance + AreaBonus(areaM2));
         return new Feature
         {
             Properties = new FeatureProperties
@@ -277,7 +283,7 @@ public sealed class OsmNormalizer
                 Name = name,
                 OsmId = osmId,
                 Category = c.Category,
-                Importance = c.Importance,
+                Importance = importance,
                 Tier = c.Tier,
                 Salience = c.Salience,
                 Street = street,
@@ -376,6 +382,39 @@ public sealed class OsmNormalizer
             if (coords.TryGetValue(id, out var c))
                 pts.Add(c);
         return RepresentativePoint.TryCompute(pts, out lon, out lat);
+    }
+
+    // ADR-0019 footprint nudge. A mild log ramp over a small-building floor (200 m²), capped at +9 so
+    // a hall tops at 65+9=74 — big halls clearly beat annexes and plain venues, yet stay below the
+    // core line (75). Log, not linear, so a stadium footprint doesn't dwarf everything.
+    private const double AreaFloorM2 = 200.0;
+    private static int AreaBonus(double areaM2)
+    {
+        if (areaM2 <= AreaFloorM2) return 0;
+        return Math.Min(9, (int)Math.Round(5 * Math.Log10(areaM2 / AreaFloorM2)));
+    }
+
+    /// <summary>Approximate footprint area (m²) of a way ring via the shoelace formula on a local
+    /// equirectangular projection. 0 for degenerate rings. Sign-agnostic (winding doesn't matter).</summary>
+    private static double PolygonAreaM2(
+        long[] nodeIds, IReadOnlyDictionary<long, (double lon, double lat)> coords)
+    {
+        var pts = new List<(double lon, double lat)>(nodeIds.Length);
+        foreach (var id in nodeIds)
+            if (coords.TryGetValue(id, out var c)) pts.Add(c);
+        if (pts.Count < 3) return 0;
+        double lat0 = 0;
+        foreach (var p in pts) lat0 += p.lat;
+        lat0 /= pts.Count;
+        double mPerLat = 111_320.0, mPerLon = 111_320.0 * Math.Cos(lat0 * Math.PI / 180.0);
+        double sum = 0;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            var a = pts[i];
+            var b = pts[(i + 1) % pts.Count];
+            sum += (a.lon * mPerLon) * (b.lat * mPerLat) - (b.lon * mPerLon) * (a.lat * mPerLat);
+        }
+        return Math.Abs(sum) / 2.0;
     }
 
     private static double Round(double v) => Math.Round(v, 7);

@@ -36,10 +36,12 @@ public static class TerrainClassifier
     {
         if (!tags.TryGetValue("name", out var name) || string.IsNullOrWhiteSpace(name))
             return (null, null);
-        if (tags.TryGetValue("natural", out var nat) && nat == "water")
+        tags.TryGetValue("natural", out var nat);
+        if (nat is "water" or "bay")                       // named lakes AND bays are water terrain
             return ("water", name);
         if ((tags.TryGetValue("leisure", out var l) && l == "park")
-            || (tags.TryGetValue("landuse", out var lu) && lu == "recreation_ground"))
+            || (tags.TryGetValue("landuse", out var lu) && lu == "recreation_ground")
+            || nat is "beach" or "wetland")                // coarse shore/marsh areas → park-like terrain
             return ("park", name);
         return (null, null);
     }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MarkdownMap.Normalizer;
 
@@ -18,13 +19,25 @@ public static class NameResolver
     {
         string? Get(string k) => tags.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
 
+        string? resolved;
         var name = Get("name");
         if (name is not null)
         {
             var shortName = Get("short_name");
-            return shortName is not null && name.Length > LongNameChars ? shortName : name;
+            resolved = shortName is not null && name.Length > LongNameChars ? shortName : name;
         }
         // No name: a brand/operator is a real name (counts as named for promotion/importance).
-        return Get("brand") ?? Get("operator");
+        else resolved = Get("brand") ?? Get("operator");
+
+        // A bare label (a single character, or all digits) is not a real name — reject it so the
+        // Feature is unnamed and clusters (ADR-0012 refined): dorm wings 'A'/'B', building numbers.
+        return IsBareLabel(resolved) ? null : resolved;
+    }
+
+    private static bool IsBareLabel(string? name)
+    {
+        if (name is null) return false;
+        var t = name.Trim();
+        return t.Length == 1 || (t.Length > 0 && t.All(char.IsDigit));
     }
 }

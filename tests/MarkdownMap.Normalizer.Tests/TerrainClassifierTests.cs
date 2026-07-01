@@ -46,8 +46,11 @@ public class TerrainClassifierTests
 
     [Theory]
     [InlineData("natural", "water", "water")]
+    [InlineData("natural", "bay", "water")]       // named bays are water terrain
     [InlineData("leisure", "park", "park")]
     [InlineData("landuse", "recreation_ground", "park")]
+    [InlineData("natural", "beach", "park")]      // shore → park-like terrain
+    [InlineData("natural", "wetland", "park")]    // marsh → park-like terrain
     public void Area_kinds(string k, string v, string kind)
     {
         var (got, name) = TerrainClassifier.Area(Tags(k, v, "name", "Greenway"));

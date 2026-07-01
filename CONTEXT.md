@@ -30,10 +30,12 @@ Lives alongside the schematic, e.g. `[42]: Old Town Library`.
 ### Connection
 A link drawn between two Features on the schematic. Annotated with a **standardized
 distance** and a **bearing** (compass direction), since the layout itself is not to
-scale. The rendered line carries **rounded metres + bearing only**; the coarse size bucket
-(adjacent / near / short walk / far) is **derivable from the metres** and is dropped from the
-markdown text (it survives in the [[explorer-react-helper|Explorer]] detail view), keeping the
-densest section terse.
+scale. The rendered line carries **rounded metres + bearing**; the coarse size bucket
+(adjacent / near / short walk) is **derivable from the metres** and dropped to stay terse — with
+one exception: a link at/over the **far** cutoff (≥500 m) is flagged **`(far)`**, because the
+proximity graph guarantees connectivity (kNN) and so a sparse area can produce a long edge that
+would otherwise read like a walkable local hop. The full bucket survives in the
+[[explorer-react-helper|Explorer]] detail view.
 
 ### Importance Tier
 A numeric rank (0–100) assigned to each Feature. It **orders** Features but no longer *alone*
@@ -46,12 +48,18 @@ landmarks/amenities/shops/civic rank above named buildings, above minor/unnamed 
 The parse-time classification of how **scene-worthy** a Feature is — distinct from raw
 [[importance-tier|importance]]. Set in the [[normalizer-stage-1|Normalizer]] from OSM tags, it sorts
 Features into: a **core** that always promotes (worship, civic **institutions** — school, library,
-hospital, post office, university building — historic sites, museums/galleries/attractions, major
-venues); **budgeted** competitors that vie for the [[promotion-budget]]; and **clustered**
-(residential/minor). Within *budgeted*, **interactive venues** (food, shops, private services like a
-dentist or salon) outrank **commemorative/decorative** landmarks (artwork, viewpoint, memorial,
-monument) — so a district's cafés and shops win seats before its sculptures, since a DM's party
-enters buildings and only walks past art. Fixes the dense-extract failures where a private dental
+hospital, post office, and singular institution *buildings* like a hospital/school/stadium/**station** —
+historic sites, museums/galleries/attractions, major venues, and the **residential addresses** of a
+neighbourhood: **named piers/moorages** in a waterfront community and **dorms** on a campus — the
+skeleton the party lives/moves among); **budgeted** competitors that vie for the [[promotion-budget]];
+and **clustered** (residential/minor). A **campus hall** (`building=university`/`college`) is *not*
+core — a campus has dozens, so a hall is a **budgeted venue-band destination** that competes like a
+café, with a small **footprint-area** nudge so the big halls out-sort the annexes (ADR-0019).
+Within *budgeted*, **interactive venues** (food, shops, private services like a dentist or salon, and
+campus halls) outrank **commemorative/decorative** landmarks (artwork, viewpoint, memorial, monument,
+walk-past man_made structures) and **civic offices** (a dept/gov office, often redundant with its core
+institution building) — so a district's cafés, shops and halls win seats before its sculptures and offices,
+since a DM's party enters/goes to places and only walks past art. Fixes the dense-extract failures where a private dental
 office ranked like a school and campus sculptures crowded out venues. **Model-affecting** (changes
 which Features get a [[token]]), so **not** a render-only [[markdownmap-settings|setting]]. See ADR-0018.
 
@@ -74,9 +82,11 @@ tuning. K a tunable default. Model-affecting. See ADR-0018.
 ### Name resolution
 How a Feature gets its display name. The Normalizer (Stage 1, the only stage with raw OSM
 tags) resolves `name → brand → operator`, preferring `short_name` over a long `name`; a name
-derived from `brand`/`operator` counts as **named** for promotion and importance. A Feature
-the Normalizer still can't name is **unnamed**. Real name parsing can only live in the
-Normalizer — the Explorer/Generator never sees the raw tags. See ADR-0012.
+derived from `brand`/`operator` counts as **named** for promotion and importance. A resolved value
+that is a **bare label** — a single character or all digits (a dorm wing `A`, a building number
+`12`) — is **not a real name**: it is rejected, so the Feature is **unnamed** and clusters (it never
+earns a [[token]] unless worship). A Feature the Normalizer still can't name is **unnamed**. Real
+name parsing can only live in the Normalizer — the Explorer/Generator never sees the raw tags. See ADR-0012.
 
 ### Unnamed fallback
 The display label for an **unnamed** Feature: its humanized **category** subclass, lowercase
@@ -296,8 +306,10 @@ Street), e.g. "N–S along Main Street: [02],[01],[03],...". Gives the LLM a glo
 frame so it need not triangulate per-Feature bearings.
 
 ### Terrain
-The orienting context block: named water bodies, parks, and Barriers with their rough
-position, so the LLM knows "the shape of the place" (what's water, what blocks movement).
+The orienting context block: named water bodies (lakes, bays), parks and other **coarse
+geographic areas** (beaches, wetlands), and Barriers with their rough position, so the LLM knows
+"the shape of the place" (what's water, what's shore/green, what blocks movement). Such areas are
+**terrain, not POI tokens** — a beach is a place you walk to, like a park, not a point.
 The **markdown** projection is deliberately **coarse — name · octant** — and stays that
 way: real geometry (ADR-0014 ring assembly) flows into the contract + Explorer SVG, never into
 the markdown text, where coordinate detail would only bloat tokens and degrade LLM reasoning. For

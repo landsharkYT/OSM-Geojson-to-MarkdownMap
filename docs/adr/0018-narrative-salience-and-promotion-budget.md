@@ -3,6 +3,10 @@
 Date: 2026-07-01
 Status: Accepted
 
+> **Refined by ADR-0019** — institutional buildings: singular institutions/stations/dorm buildings
+> join the **core**, while `building=university`/`college` campus halls are **budgeted venue-band**
+> competitors with a footprint-area nudge (so a campus's 100+ halls don't flood the budget).
+
 Extends [ADR-0012](0012-name-resolution-and-co-location-merge.md) (name resolution, importance,
 tiered unnamed promotion). ADR-0012's promotion rule — *every `landmark` and named `destination` Feature
 gets a token* — does not survive a dense extract.

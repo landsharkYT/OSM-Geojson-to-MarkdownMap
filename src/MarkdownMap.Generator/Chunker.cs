@@ -317,8 +317,8 @@ internal static class Chunker
         // Reading key: always on (self-containment), compressed.
         sb.Append("## How to read\n\n");
         sb.Append("- `[token] Name (category)` a local feature; `→ [token] — ~<m>m <DIR>` a straight-line\n");
-        sb.Append("  hop (N = up; 8-wind). `[crosses <road>]` road/rail between; `[separated by water]` water\n");
-        sb.Append("  between. **Not to scale.** **Ways out** are the only routes to other areas.\n\n");
+        sb.Append("  hop (N = up; 8-wind); `(far)` = ≥500 m, not a local hop. `[crosses <road>]` road/rail\n");
+        sb.Append("  between; `[separated by water]` water between. **Not to scale.** **Ways out** are the only routes out.\n\n");
 
         AppendBounds(sb, c.Bounds);
         AppendLocalTerrain(sb, m.Terrain, c.Bounds, opts.MinTerrainAreaM2);
@@ -359,6 +359,7 @@ internal static class Chunker
                     // Metres + bearing only; size bucket dropped (grill 2026-06-30).
                     sb.Append(" — ~").Append(e.Meters.ToString(CultureInfo.InvariantCulture)).Append("m ")
                       .Append(e.Dir);
+                    if (MapGenerator.IsFarHop(e.Meters, opts.Buckets)) sb.Append(" (far)");
                     if (e.SeparatedByWater) sb.Append(" [separated by water]");
                     if (e.Crosses is not null) sb.Append(" [crosses ").Append(e.Crosses).Append(']');
                     sb.Append('\n');

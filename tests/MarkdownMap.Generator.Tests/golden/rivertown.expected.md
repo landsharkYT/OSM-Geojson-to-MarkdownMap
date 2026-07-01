@@ -12,7 +12,7 @@ here; if something is not on the map, it is unknown — say so rather than guess
 - `[token] Name (category)` optionally `· on <street> · <district>`.
 - `→ [token] — ~<m>m <DIR>`: the linked feature (look up its token above) lies ~<m>
   metres away, compass `<DIR>` (N = up; 8-wind). Straight-line closeness, **not to scale**
-  — only the numbers and letters are real.
+  — only the numbers and letters are real. `(far)` = ≥500 m, not a walkable local hop.
 - Flags: `[crosses <road>]` a road/rail lies between (cross at a crossing); `[separated by
   water]` open water lies between (not directly walkable); `stands apart` reached only across water.
 - `spine:` orders a district along its axis; `clustered:` counts minor features not listed.
