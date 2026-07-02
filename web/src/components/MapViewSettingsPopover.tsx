@@ -11,7 +11,17 @@ const LAYER_LABELS: Record<keyof Layers, string> = {
   terrain: 'Terrain',
   edges: 'Proximity links',
   minors: 'Minor features',
+  props: 'Prop features',
   tokens: 'Tokens',
+}
+
+// Short, plain descriptions for every layer (the live "map ≠ markdown" warning is the App banner).
+const LAYER_NOTES: Record<keyof Layers, string> = {
+  terrain: 'Water, parks, and barriers.',
+  edges: 'Nearness between features, not streets.',
+  minors: 'Named background places.',
+  props: 'Unnamed background features.',
+  tokens: 'Promoted features and their labels.',
 }
 
 /** Map view settings (ADR-0013) — display-only; never touches the pipeline. */
@@ -62,15 +72,8 @@ export function MapViewSettingsPopover({ value, onChange, onClose }: Props) {
             />
             <span>
               <span className="block">{LAYER_LABELS[k]}</span>
-              {k === 'minors' && (
-                <span className="block text-xs text-slate-500 dark:text-slate-400">
-                  Not in the markdown. The AI only sees a count of these.{' '}
-                  {value.layers.minors && (
-                    <span className="font-medium text-amber-700 dark:text-amber-300">
-                      On: the map no longer represents the markdown.
-                    </span>
-                  )}
-                </span>
+              {LAYER_NOTES[k] && (
+                <span className="block text-xs text-slate-500 dark:text-slate-400">{LAYER_NOTES[k]}</span>
               )}
             </span>
           </label>

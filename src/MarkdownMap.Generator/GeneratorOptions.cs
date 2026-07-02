@@ -44,6 +44,14 @@ public sealed class GeneratorOptions
     public bool DirectivePreamble { get; set; } = true;
 
     /// <summary>
+    /// List named **minor features** per District (ADR-0020): the named clustered set-dressing that
+    /// never won a token. Render-only (ADR-0011) — the model always carries the split; this only
+    /// decides whether it is written. Default off: with it off the markdown is byte-identical to a map
+    /// that never knew the tier (the `clustered: ~N minor` count stays the full total).
+    /// </summary>
+    public bool MinorFeatures { get; set; } = false;
+
+    /// <summary>
     /// Render the map as a set of self-contained scene-chunks instead of one document (ADR-0016).
     /// Render-only over the MapModel; the whole-area markdown is still produced alongside.
     /// </summary>

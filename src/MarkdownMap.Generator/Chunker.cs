@@ -259,14 +259,17 @@ internal static class Chunker
 
     // ----- minors -----
 
-    private static Dictionary<string, int> ClusterMinors(MapModel m, List<Chunk> chunks, Dictionary<string, Chunk> chunkOf)
+    private static Dictionary<string, (int Total, int Props, List<NamedMinor> Named)> ClusterMinors(
+        MapModel m, List<Chunk> chunks, Dictionary<string, Chunk> chunkOf)
     {
-        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-        if (m.Minors.Count == 0 || chunks.Count == 0) return counts;
+        if (m.Minors.Count == 0 || chunks.Count == 0)
+            return new Dictionary<string, (int, int, List<NamedMinor>)>(StringComparer.Ordinal);
         var feat = m.Features;
+        // Assign each minor to the chunk holding its nearest promoted feature, then reuse the shared
+        // named/prop split (ADR-0020) keyed by chunk name.
+        var chunkNameOf = new Dictionary<MinorFeature, string>();
         foreach (var minor in m.Minors)
         {
-            // assign to the chunk holding the promoted feature nearest the minor
             var mp = new LonLat(minor.Lon, minor.Lat);
             string? bestTok = null; double bestD = double.MaxValue;
             foreach (var f in feat)
@@ -275,9 +278,9 @@ internal static class Chunker
                 if (d < bestD) { bestD = d; bestTok = f.Token; }
             }
             if (bestTok is not null && chunkOf.TryGetValue(bestTok, out var c))
-                counts[c.Name] = counts.TryGetValue(c.Name, out var n) ? n + 1 : 1;
+                chunkNameOf[minor] = c.Name;
         }
-        return counts;
+        return MapGenerator.ClusterSplit(chunkNameOf.Keys, mf => chunkNameOf[mf]);
     }
 
     private static HashSet<string> StandsApartTokens(List<Edge> edges)
@@ -298,7 +301,8 @@ internal static class Chunker
     private static string RenderChunk(
         Chunk c, MapModel m, GeneratorOptions opts,
         Dictionary<string, PromotedFeature> byToken, Dictionary<string, Chunk> chunkOf,
-        Dictionary<string, List<Exit>> exits, Dictionary<string, int> clustered, HashSet<string> standsApart)
+        Dictionary<string, List<Exit>> exits,
+        Dictionary<string, (int Total, int Props, List<NamedMinor> Named)> clustered, HashSet<string> standsApart)
     {
         var sb = new StringBuilder();
         sb.Append("# SCENE-CHUNK — ").Append(c.Name).Append(" · ").Append(m.Title).Append("\n\n");
@@ -367,8 +371,8 @@ internal static class Chunker
             if (i < c.Tokens.Count - 1) sb.Append('\n');
         }
         sb.Append("```\n");
-        if (clustered.TryGetValue(c.Name, out var minors) && minors > 0)
-            sb.Append("\nclustered: ~").Append(minors.ToString(CultureInfo.InvariantCulture)).Append(" minor\n");
+        if (clustered.TryGetValue(c.Name, out var cs))
+            MapGenerator.AppendClusteredLines(sb, opts.MinorFeatures, cs.Total, cs.Named, cs.Props, "\n");
 
         // Ways out.
         sb.Append("\n## Ways out\n\n");

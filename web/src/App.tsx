@@ -21,15 +21,27 @@ export default function App() {
   const [dragging, setDragging] = useState(false)
   const [legendOpen, setLegendOpen] = useState(false)
   const [mapSettingsOpen, setMapSettingsOpen] = useState(false)
-  const [minorsWarningDismissed, setMinorsWarningDismissed] = useState(false)
+  // Dismissed honesty banner, keyed by its message: re-arms whenever the mismatch changes (ADR-0020).
+  const [dismissedWarning, setDismissedWarning] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   function changeMapView(next: MapViewSettings) {
-    // Re-arm the warning each time minors are turned off, so re-enabling shows it again.
-    if (!next.layers.minors) setMinorsWarningDismissed(false)
     setMapView(next)
     saveMapView(next)
   }
+
+  // Adaptive map/markdown honesty (ADR-0020). Prop dots are never in the markdown; named minor dots are
+  // in it only when the "Minor features" setting is on. Surplus = map draws what the AI can't see;
+  // deficit = the markdown lists minor features the map hides.
+  const mapMismatch = (() => {
+    const surplus = mapView.layers.props || (mapView.layers.minors && !settings.minorFeatures)
+    const deficit = settings.minorFeatures && !mapView.layers.minors
+    if (surplus && deficit)
+      return "⚠ This map doesn't match the markdown. Some features it shows aren't in the text, and some in the text aren't shown."
+    if (surplus) return "⚠ You're showing features the AI can't see. This map shows more than the markdown."
+    if (deficit) return '⚠ This map is hiding named minor features the markdown lists. It shows less than the AI sees.'
+    return null
+  })()
 
   // Display-only (sidebar render mode): persist, no re-render — the markdown text is unchanged.
   function changeDisplay(next: MarkdownDisplaySettings) {
@@ -163,17 +175,17 @@ export default function App() {
         {model ? (
           <>
             <div className="relative min-w-0 flex-1">
-              {mapView.layers.minors && !minorsWarningDismissed && (
+              {mapMismatch && mapMismatch !== dismissedWarning && (
                 <div
                   role="status"
                   className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center p-2"
                 >
                   <span className="pointer-events-auto flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50/95 py-1.5 pl-3 pr-1.5 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-700 dark:bg-amber-950/90 dark:text-amber-200">
-                    <span>⚠ You’re showing minor features the AI can’t see. This map no longer matches the markdown.</span>
+                    <span>{mapMismatch}</span>
                     <button
                       type="button"
                       aria-label="Dismiss warning"
-                      onClick={() => setMinorsWarningDismissed(true)}
+                      onClick={() => setDismissedWarning(mapMismatch)}
                       className="rounded p-0.5 text-amber-600 hover:bg-amber-200/60 hover:text-amber-900 dark:text-amber-400 dark:hover:bg-amber-800/60 dark:hover:text-amber-100"
                     >
                       <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">

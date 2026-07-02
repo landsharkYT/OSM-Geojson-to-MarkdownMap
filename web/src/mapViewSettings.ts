@@ -4,7 +4,8 @@
 export interface Layers {
   terrain: boolean
   edges: boolean
-  minors: boolean
+  minors: boolean // named minor features (ADR-0020)
+  props: boolean  // nameless prop features (ADR-0020)
   tokens: boolean
 }
 
@@ -17,12 +18,12 @@ export interface MapViewSettings {
   detailedTerrain: boolean
 }
 
-// `minors` defaults OFF so the map is honest by default: it shows only what the AI sees in the
-// markdown (promoted tokens + orienting terrain). Minor/clustered features are counted in the
-// markdown, never individually named — plotting them makes the map show MORE than the text, so it is
-// opt-in behind a warning (App banner + popover note).
+// `minors` and `props` default OFF so the map is honest by default: it shows only what the AI sees in
+// the markdown (promoted tokens + orienting terrain). Prop features are never in the markdown, and
+// minor features only when their setting is on — drawing either can make the map disagree with the
+// text, so both are opt-in behind the adaptive honesty banner (ADR-0020).
 export const DEFAULT_MAP_VIEW: MapViewSettings = {
-  layers: { terrain: true, edges: true, minors: false, tokens: true },
+  layers: { terrain: true, edges: true, minors: false, props: false, tokens: true },
   detailedTerrain: true,
 }
 

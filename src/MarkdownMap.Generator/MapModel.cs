@@ -64,14 +64,27 @@ public sealed class PromotedFeature
     public double Lat { get; set; }
 }
 
-/// <summary>A minor feature: clustered (counted) in markdown, plotted faintly in the Explorer.</summary>
+/// <summary>
+/// A clustered feature: counted (not tokenized) in the markdown, plotted faintly in the Explorer.
+/// <see cref="Named"/> splits the tier (ADR-0020): a <b>minor feature</b> carries a real name and can
+/// be listed by the opt-in setting; a <b>prop feature</b> is nameless set-dressing (its <see cref="Name"/>
+/// is the humanized category, e.g. `pier`) and is only ever a count.
+/// </summary>
 public sealed class MinorFeature
 {
     public string Name { get; set; } = "";
     public string Category { get; set; } = "";
+    public bool Named { get; set; } // true = real name (minor feature); false = category fallback (prop)
     public string? District { get; set; }
     public double Lon { get; set; }
     public double Lat { get; set; }
+}
+
+/// <summary>A named minor feature aggregated for a District/chunk list: name + how many share it (ADR-0020).</summary>
+public sealed class NamedMinor
+{
+    public string Name { get; set; } = "";
+    public int Count { get; set; }
 }
 
 /// <summary>A proximity-graph connection (one direction).</summary>
@@ -94,7 +107,9 @@ public sealed class District
     public string SpineDir { get; set; } = "";
     public List<string> SpineTokens { get; set; } = new();
     public int PromotedCount { get; set; }
-    public int ClusteredCount { get; set; }
+    public int ClusteredCount { get; set; }         // total clustered (named + nameless); the count shown when the toggle is off
+    public List<NamedMinor> NamedMinors { get; set; } = new(); // deduped named minor features (ADR-0020), for the opt-in list
+    public int PropCount { get; set; }              // nameless (prop) clustered count; the relabeled count when the toggle is on
     public double AnchorLon { get; set; }
     public double AnchorLat { get; set; }
 }

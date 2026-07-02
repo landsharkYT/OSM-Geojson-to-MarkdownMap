@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MapView, type Layers } from './MapView'
 import { rivertown } from '../test/fixture'
 
-const ALL: Layers = { terrain: true, edges: true, minors: true, tokens: true }
+const ALL: Layers = { terrain: true, edges: true, minors: true, props: true, tokens: true }
 
 describe('MapView', () => {
   it('renders token labels for promoted features', () => {
@@ -44,8 +44,20 @@ describe('MapView', () => {
     expect(screen.queryByText('Maple Apartments')).not.toBeInTheDocument()
   })
 
-  it('has no minor hit targets when the minors layer is off', () => {
-    const { container } = render(<MapView model={rivertown} selected={null} onSelect={() => {}} layers={{ ...ALL, minors: false }} detailedTerrain />)
+  it('has no minor hit targets when both minor tiers are off', () => {
+    const { container } = render(<MapView model={rivertown} selected={null} onSelect={() => {}} layers={{ ...ALL, minors: false, props: false }} detailedTerrain />)
     expect(minorHitTarget(container)).toBeUndefined()
+  })
+
+  it('draws named minors and nameless props on separate layers', () => {
+    // Only the named minor when props is off; only the prop when minors is off.
+    const onlyNamed = render(<MapView model={rivertown} selected={null} onSelect={() => {}} layers={{ ...ALL, props: false }} detailedTerrain />)
+    fireEvent.mouseEnter(minorHitTarget(onlyNamed.container)!)
+    expect(onlyNamed.getByText('Maple Apartments')).toBeInTheDocument()
+    onlyNamed.unmount()
+
+    const onlyProps = render(<MapView model={rivertown} selected={null} onSelect={() => {}} layers={{ ...ALL, minors: false }} detailedTerrain />)
+    fireEvent.mouseEnter(minorHitTarget(onlyProps.container)!)
+    expect(onlyProps.getByText('house')).toBeInTheDocument() // the nameless prop
   })
 })

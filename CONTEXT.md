@@ -116,6 +116,23 @@ as category-label tokens (`swimming pool`, `maritime`) are pure noise. A fixed d
 — model-affecting, unlike the render-only [[markdownmap-settings]]). Tightens ADR-0012's original
 tiered rule to its intent. See ADR-0012 and ADR-0018.
 
+### Minor feature
+A clustered Feature that carries a **real name** (`name → brand → operator`, not the humanized
+category) but never earned a [[token]] — a named apartment block, a named grave, a café that lost the
+[[promotion-budget]]. Set-dressing a DM can still name. Folded into the count by default; an **opt-in**
+[[markdownmap-settings|setting]] ("Minor features", render-only, default off) instead lists them per
+[[district-cluster|District]] as a compact names line, **deduped by name** with an `×N` count, and the
+count relabels to the remaining [[prop-feature|props]]. With the setting off the markdown is
+byte-identical (the split lives in the model, unrendered). Distinct from a [[prop-feature]] (nameless)
+and from a [[token]] (promoted). Deliberately inoptimal — useful on a sparse extract, noisy on a dense
+one — hence a toggle. See ADR-0020.
+
+### Prop feature
+A clustered Feature whose "name" is **just its category** (an unnamed pier → `pier`, a nameless
+`house`) — anonymous background scenery. **Never** listed in the markdown; only ever part of the
+count. The residual tier once the named [[minor-feature|minor features]] are separated out. In the
+[[explorer-react-helper|Explorer]] it is its own dot layer, distinct from minor features. See ADR-0020.
+
 ### District (Cluster)
 A named group of lower-tier Features shown as a single block instead of individual
 Tokens, e.g. "Harborside (+38 minor buildings)". Keeps a whole-area
@@ -217,7 +234,8 @@ The generation knobs that change the produced **MarkdownMap** (the copied artifa
 via a settings button on the MarkdownMap panel. v1 surfaces the **render-only** knobs —
 `bidirectional` (each link under both features or once), `inlineNeighborName`,
 `directivePreamble` (the behavioral [[directive-preamble]] only — the [[reading-key]] is always
-emitted, never a knob), plus [[chunking]] + [[scene-size]]. These change only the rendered
+emitted, never a knob), `minorFeatures` (list named [[minor-feature|minor features]] per district,
+ADR-0020), plus [[chunking]] + [[scene-size]]. These change only the rendered
 markdown, never the **MapModel**, so a change re-renders the cached model instantly with no
 re-parse (ADR-0011). Live + persisted. **Distinct from [[layer toggles]]**, which only affect the
 SVG view. Model-affecting knobs (`neighborsPerFeature`, `buckets`) are deferred. Both terser
@@ -234,17 +252,19 @@ the WASM options DTO, so it is persisted separately. Rendering is sanitized (mar
 OSM names are user data, so a place literally named `<img onerror=…>` must never execute.
 
 ### Layer toggles
-Checkboxes (Terrain / Edges / Minor features / Tokens) that show or hide **SVG** map layers in
-the human-facing view. A display concern only — they do **not** affect the generated
+Checkboxes (Terrain / Edges / Minor features / Prop features / Tokens) that show or hide **SVG** map
+layers in the human-facing view. A display concern only — they do **not** affect the generated
 MarkdownMap. Live behind the [[map-view-settings]] button. Distinct from [[markdownmap-settings]].
-**Honest-by-default:** the map shows only what the AI sees in the markdown — **Minor features**
-default **off** (they are *counted* in the markdown, never individually named, so plotting them makes
-the map show more than the text; a banner + popover note warn when they are revealed), and the Terrain
-layer draws only the **orienting-scale** areas the markdown lists (sub-threshold pocket parks are
-filtered out client-side, mirroring the Generator). The clustered/minor positions and full terrain
-geometry still reach the browser — the toggle only governs what is *drawn*. When Minor features are
-shown, each dot is **hover-inspectable** (a small tooltip names it and its category) — a look-only
-affordance, separate from the token/sidebar selection, since a minor has no [[token]].
+**Honest-by-default:** the map shows only what the AI sees in the markdown. [[minor-feature|Minor
+features]] and [[prop-feature|prop features]] are **separate layers, both default off**, and the
+Terrain layer draws only the **orienting-scale** areas the markdown lists (sub-threshold pocket parks
+filtered out client-side, mirroring the Generator). Because a prop is *never* in the markdown and a
+named minor is in it only when its [[markdownmap-settings|setting]] is on, drawing either can make the
+map disagree with the text — an **adaptive banner** flags this both ways: *surplus* (the map draws what
+the AI can't see) and *deficit* (the markdown lists minor features the map hides); dismissable,
+re-arming when the mismatch changes. The clustered positions and full terrain geometry still reach the
+browser — the toggle only governs what is *drawn*. Each dot is **hover-inspectable** (a small tooltip
+names it and its category), a look-only affordance separate from the token/sidebar selection. See ADR-0020.
 
 ### Map view settings
 The Explorer's **display-only** settings (ADR-0013), behind a ⚙ button in the header — separate

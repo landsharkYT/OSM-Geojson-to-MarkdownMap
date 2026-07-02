@@ -7,6 +7,8 @@ export interface MarkdownMapSettings {
   bidirectional: boolean
   inlineNeighborName: boolean
   directivePreamble: boolean
+  // List named minor features per district (ADR-0020). Render-only, default off; opt-in set-dressing.
+  minorFeatures: boolean
   // Scene-chunk retrieval (ADR-0016): split the map into self-contained per-area chunks.
   chunking: boolean
   sceneSize: SceneSize
@@ -16,6 +18,7 @@ export const DEFAULT_SETTINGS: MarkdownMapSettings = {
   bidirectional: false,
   inlineNeighborName: false,
   directivePreamble: true,
+  minorFeatures: false,
   chunking: false,
   sceneSize: 'standard',
 }

@@ -110,6 +110,8 @@ public sealed class MapGenerator
         }
 
         // --- minors (clustered in markdown, plotted in the Explorer) ---
+        // Named split (ADR-0020): a real resolved name → a "minor feature" (listable); no name → a
+        // "prop feature" whose Name is the humanized category fallback (e.g. `pier`).
         var minors = minorF.Select(m =>
         {
             var mp = GeoJsonReader.PointOf(m);
@@ -117,6 +119,7 @@ public sealed class MapGenerator
             {
                 Name = NameOf(m.Properties),
                 Category = m.Properties.Category ?? "",
+                Named = !string.IsNullOrEmpty(m.Properties.Name),
                 District = hasDistricts ? Districts.Nearest(mp, anchors) : null,
                 Lon = mp.Lon,
                 Lat = mp.Lat,
@@ -153,7 +156,7 @@ public sealed class MapGenerator
             Features = features,
             Minors = minors,
             Edges = edges,
-            Districts = BuildDistricts(promotedF, points, district, minorF, anchors, Token),
+            Districts = BuildDistricts(promotedF, points, district, minors, anchors, Token),
             Terrain = BuildTerrain(fc, fc.Properties.Bounds),
         };
         return Compose(model);
@@ -195,7 +198,7 @@ public sealed class MapGenerator
 
     private List<District> BuildDistricts(
         List<Feature> promoted, List<LonLat> points, List<string?> district,
-        List<Feature> minors, List<Anchor> anchors, Func<int, string> token)
+        List<MinorFeature> minors, List<Anchor> anchors, Func<int, string> token)
     {
         if (anchors.Count == 0) return new List<District>();
 
@@ -206,12 +209,9 @@ public sealed class MapGenerator
             if (!groups.TryGetValue(d, out var list)) groups[d] = list = new List<int>();
             list.Add(i);
         }
-        var minorCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var m in minors)
-        {
-            var d = Districts.Nearest(GeoJsonReader.PointOf(m), anchors)!;
-            minorCounts[d] = minorCounts.TryGetValue(d, out var c) ? c + 1 : 1;
-        }
+        // Per-District clustered split (ADR-0020): total (for the byte-identical toggle-off count),
+        // nameless prop count, and the named minors deduped by name (case-insensitive) with ×N counts.
+        var clustered = ClusterSplit(minors.Where(m => m.District != null), m => m.District!);
 
         var result = new List<District>();
         foreach (var g in groups.OrderByDescending(g => g.Value.Count).ThenBy(g => g.Key, StringComparer.Ordinal))
@@ -239,10 +239,30 @@ public sealed class MapGenerator
                 SpineDir = dir,
                 SpineTokens = spineTokens,
                 PromotedCount = idxs.Count,
-                ClusteredCount = minorCounts.TryGetValue(g.Key, out var mc) ? mc : 0,
+                ClusteredCount = clustered.TryGetValue(g.Key, out var cs) ? cs.Total : 0,
+                NamedMinors = cs.Named ?? new List<NamedMinor>(),
+                PropCount = cs.Props,
                 AnchorLon = anchor.Lon,
                 AnchorLat = anchor.Lat,
             });
+        }
+        return result;
+    }
+
+    /// <summary>The clustered split (ADR-0020) keyed by District/chunk: total, nameless prop count, and
+    /// the named minors deduped by name (case-insensitive) with an <c>×N</c> count, name-sorted.</summary>
+    internal static Dictionary<string, (int Total, int Props, List<NamedMinor> Named)> ClusterSplit(
+        IEnumerable<MinorFeature> minors, Func<MinorFeature, string> keyOf)
+    {
+        var result = new Dictionary<string, (int, int, List<NamedMinor>)>(StringComparer.Ordinal);
+        foreach (var g in minors.GroupBy(keyOf, StringComparer.Ordinal))
+        {
+            var named = g.Where(m => m.Named)
+                .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(ng => new NamedMinor { Name = ng.First().Name, Count = ng.Count() })
+                .OrderBy(nm => nm.Name, StringComparer.Ordinal)
+                .ToList();
+            result[g.Key] = (g.Count(), g.Count(m => !m.Named), named);
         }
         return result;
     }
@@ -347,7 +367,7 @@ public sealed class MapGenerator
     }
 
     // The reading key: always emitted (self-containment), compressed to a few dense lines.
-    private static void AppendHowToRead(StringBuilder sb, bool hasDistricts, bool hasTerrain)
+    private void AppendHowToRead(StringBuilder sb, bool hasDistricts, bool hasTerrain)
     {
         sb.Append("## How to read\n\n");
         sb.Append("- `[token] Name (category)`");
@@ -358,7 +378,9 @@ public sealed class MapGenerator
         if (hasTerrain)
             sb.Append("- Flags: `[crosses <road>]` a road/rail lies between (cross at a crossing); `[separated by\n  water]` open water lies between (not directly walkable); `stands apart` reached only across water.\n");
         if (hasDistricts)
-            sb.Append("- `spine:` orders a district along its axis; `clustered:` counts minor features not listed.\n");
+            sb.Append(_opts.MinorFeatures
+                ? "- `spine:` orders a district along its axis; `minor:` lists named minor features (`×N` = that many); `props:` counts unnamed background features not listed.\n"
+                : "- `spine:` orders a district along its axis; `clustered:` counts minor features not listed.\n");
         sb.Append('\n');
     }
 
@@ -424,7 +446,7 @@ public sealed class MapGenerator
         return total;
     }
 
-    private static void AppendDistricts(StringBuilder sb, List<District> districts)
+    private void AppendDistricts(StringBuilder sb, List<District> districts)
     {
         sb.Append("## Districts\n\n");
         foreach (var d in districts)
@@ -438,11 +460,44 @@ public sealed class MapGenerator
             sb.Append(": ").Append(string.Join(",", d.SpineTokens)).Append('\n');
 
             sb.Append("promoted: ").Append(d.PromotedCount.ToString(CultureInfo.InvariantCulture)).Append('\n');
-            if (d.ClusteredCount > 0)
-                sb.Append("clustered: ~").Append(d.ClusteredCount.ToString(CultureInfo.InvariantCulture)).Append(" minor\n");
+            AppendClustered(sb, d.ClusteredCount, d.NamedMinors, d.PropCount);
             sb.Append('\n');
         }
     }
+
+    /// <summary>
+    /// The clustered line(s) for a District/chunk (ADR-0020). Toggle off → the single byte-identical
+    /// `clustered: ~N minor` total. Toggle on → the named minor features listed (deduped, `×N`), and the
+    /// count relabels to the nameless remainder (`props: ~N`).
+    /// </summary>
+    private void AppendClustered(StringBuilder sb, int total, List<NamedMinor> named, int props) =>
+        AppendClusteredLines(sb, _opts.MinorFeatures, total, named, props, "");
+
+    /// <summary>Shared by whole-area and chunks (ADR-0020). <paramref name="prefix"/> is written once
+    /// before the first line ("" whole-area, "\n" for a chunk's blank-line separation).</summary>
+    internal static void AppendClusteredLines(
+        StringBuilder sb, bool minorFeatures, int total, List<NamedMinor> named, int props, string prefix)
+    {
+        if (!minorFeatures)
+        {
+            if (total > 0)
+                sb.Append(prefix).Append("clustered: ~").Append(total.ToString(CultureInfo.InvariantCulture)).Append(" minor\n");
+            return;
+        }
+        bool first = true;
+        if (named.Count > 0)
+        {
+            // ` · ` (not `, `): a place name may contain a comma, and the middle dot is the markdown's
+            // standard field separator elsewhere — so a name is never mistaken for two (ADR-0020).
+            sb.Append(prefix).Append("minor: ").Append(string.Join(" · ", named.Select(NamedMinorLabel))).Append('\n');
+            first = false;
+        }
+        if (props > 0)
+            sb.Append(first ? prefix : "").Append("props: ~").Append(props.ToString(CultureInfo.InvariantCulture)).Append('\n');
+    }
+
+    private static string NamedMinorLabel(NamedMinor n) =>
+        n.Count > 1 ? n.Name + " ×" + n.Count.ToString(CultureInfo.InvariantCulture) : n.Name;
 
     private void AppendConnections(StringBuilder sb, List<PromotedFeature> features, List<Edge> edges, List<District> districts)
     {

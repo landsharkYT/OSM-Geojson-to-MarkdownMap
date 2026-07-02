@@ -9,7 +9,8 @@ export const rivertown: MapModel = {
     { token: '[02]', name: 'The Anchor Tavern', category: 'food.bar', importance: 65, tier: 'destination', street: 'Main Street', district: 'Old Town', lon: -120.5001, lat: 45.5203 },
   ],
   minors: [
-    { name: 'Maple Apartments', category: 'residential.apartments', district: 'Old Town', lon: -120.5002, lat: 45.5206 },
+    { name: 'Maple Apartments', category: 'residential.apartments', named: true, district: 'Old Town', lon: -120.5002, lat: 45.5206 },
+    { name: 'house', category: 'residential.house', named: false, district: 'Old Town', lon: -120.5003, lat: 45.5205 },
   ],
   edges: [
     { fromToken: '[01]', toToken: '[02]', toName: 'The Anchor Tavern', meters: 80, dir: 'S', bucket: 'near' },

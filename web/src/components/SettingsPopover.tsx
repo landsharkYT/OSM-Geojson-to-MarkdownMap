@@ -10,7 +10,7 @@ interface Props {
 }
 
 // Only the boolean knobs render as checkboxes here; sceneSize has its own control below.
-type BoolKey = 'bidirectional' | 'inlineNeighborName' | 'directivePreamble' | 'chunking'
+type BoolKey = 'bidirectional' | 'inlineNeighborName' | 'directivePreamble' | 'minorFeatures' | 'chunking'
 
 const ITEMS: { key: BoolKey; label: string; help: string }[] = [
   {
@@ -27,6 +27,11 @@ const ITEMS: { key: BoolKey; label: string; help: string }[] = [
     key: 'directivePreamble',
     label: 'Directive preamble',
     help: 'Include the “authoritative map” instruction block for the LLM.',
+  },
+  {
+    key: 'minorFeatures',
+    label: 'Minor features',
+    help: 'List named minor features (set-dressing) per district. Noisy on dense maps.',
   },
 ]
 

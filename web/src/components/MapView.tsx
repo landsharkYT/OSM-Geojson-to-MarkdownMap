@@ -189,22 +189,24 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain, hi
 
       {/* --- symbol layer: constant screen size, positioned by the transform --- */}
       <g>
-        {layers.minors &&
-          model.minors.map((f, i) => {
-            const [px, py] = proj.project(f.lon, f.lat)
-            const x = sx(px), y = sy(py)
-            const hov = hoverMinor === i
-            return (
-              <g key={`m${i}`}>
-                <circle cx={x} cy={y} r={hov ? 3.5 : 2} fill={hov ? '#cbd5e1' : '#94a3b8'}
-                  opacity={highlightSet ? 0.15 : hov ? 0.95 : 0.5} />
-                {/* transparent hit target — the 2px dot is too small to land on directly */}
-                <circle cx={x} cy={y} r={5} fill="transparent" className="cursor-help"
-                  onMouseEnter={() => setHoverMinor(i)}
-                  onMouseLeave={() => setHoverMinor((h) => (h === i ? null : h))} />
-              </g>
-            )
-          })}
+        {model.minors.map((f, i) => {
+          // ADR-0020: named minors and nameless props are separate layers, with distinct colours.
+          if (!(f.named ? layers.minors : layers.props)) return null
+          const [px, py] = proj.project(f.lon, f.lat)
+          const x = sx(px), y = sy(py)
+          const hov = hoverMinor === i
+          const base = f.named ? '#93c5fd' : '#64748b' // named = blue, prop = slate
+          return (
+            <g key={`m${i}`}>
+              <circle cx={x} cy={y} r={hov ? 3.5 : 2} fill={hov ? '#e2e8f0' : base}
+                opacity={highlightSet ? 0.15 : hov ? 0.95 : f.named ? 0.6 : 0.45} />
+              {/* transparent hit target — the 2px dot is too small to land on directly */}
+              <circle cx={x} cy={y} r={5} fill="transparent" className="cursor-help"
+                onMouseEnter={() => setHoverMinor(i)}
+                onMouseLeave={() => setHoverMinor((h) => (h === i ? null : h))} />
+            </g>
+          )
+        })}
 
         {/* crossing markers: a red ✕ on the selected feature's links that cross a barrier
             (distinct from a barrier, which is a red dashed line) */}
@@ -249,8 +251,9 @@ export function MapView({ model, selected, onSelect, layers, detailedTerrain, hi
             )
           })}
 
-        {/* minor-feature hover tooltip — drawn last so it sits on top; just says what it is */}
-        {layers.minors && hoverMinor != null && model.minors[hoverMinor] && (() => {
+        {/* minor/prop hover tooltip — drawn last so it sits on top; just says what it is */}
+        {hoverMinor != null && model.minors[hoverMinor] &&
+          (model.minors[hoverMinor].named ? layers.minors : layers.props) && (() => {
           const f = model.minors[hoverMinor]
           const [px, py] = proj.project(f.lon, f.lat)
           const x = sx(px), y = sy(py)

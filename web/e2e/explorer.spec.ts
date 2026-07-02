@@ -242,7 +242,7 @@ test('the map is honest by default: minor features off, warning only when reveal
   await page.setInputFiles('input[type="file"]', fixture)
   await expect(page.locator('main svg').getByText('[01]', { exact: true })).toBeVisible()
 
-  const warning = page.getByText('no longer matches the markdown', { exact: false })
+  const warning = page.getByText('shows more than the markdown', { exact: false })
   await expect(warning).toBeHidden() // default view = what the AI sees; no surplus, no warning
 
   await page.getByRole('button', { name: 'Map view settings' }).click()
@@ -258,4 +258,17 @@ test('the map is honest by default: minor features off, warning only when reveal
   // Dismissing only hides the warning; the minor layer is still on.
   await page.getByRole('button', { name: 'Map view settings' }).click()
   await expect(page.getByRole('checkbox', { name: /Minor features/ })).toBeChecked()
+})
+
+test('the adaptive banner flags a deficit when the markdown lists minors the map hides', async ({ page }) => {
+  await page.goto('/')
+  await page.setInputFiles('input[type="file"]', fixture)
+  await expect(page.locator('main svg').getByText('[01]', { exact: true })).toBeVisible()
+
+  // Put named minor features INTO the markdown, but leave the map's minor layer off → deficit.
+  await page.getByRole('button', { name: 'MarkdownMap settings' }).click()
+  await page.getByRole('checkbox', { name: /Minor features/ }).check()
+  await page.keyboard.press('Escape')
+
+  await expect(page.getByText('hiding named minor features', { exact: false })).toBeVisible()
 })

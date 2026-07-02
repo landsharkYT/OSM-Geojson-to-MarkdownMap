@@ -83,6 +83,7 @@ public static class MapBuilder
         if (dto.DirectivePreamble is bool d) o.DirectivePreamble = d;
         if (dto.Chunking is bool ch) o.Chunking = ch;
         if (dto.SceneSize is string s) o.SceneSize = GeneratorOptions.SceneSizeFor(s);
+        if (dto.MinorFeatures is bool mf) o.MinorFeatures = mf;
         return o;
     }
 
@@ -93,6 +94,7 @@ public static class MapBuilder
         public bool? DirectivePreamble { get; set; }
         public bool? Chunking { get; set; }
         public string? SceneSize { get; set; }
+        public bool? MinorFeatures { get; set; }
     }
 
     private static string Error(Exception ex) =>

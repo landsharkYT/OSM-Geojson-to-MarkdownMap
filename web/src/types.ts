@@ -42,6 +42,8 @@ export interface PromotedFeature {
 export interface MinorFeature {
   name: string
   category: string
+  // ADR-0020: true = a real name (minor feature); false = name is just the category (prop feature).
+  named: boolean
   district?: string
   lon: number
   lat: number
