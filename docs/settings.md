@@ -2,14 +2,14 @@
 
 Knobs the Generator (and Normalizer) should expose. v1 ships the **default**; these
 become user settings after the first prototype. None are hardcoded constants buried in
-logic — they live here and flow from config.
+logic; they live here and flow from config.
 
 | Setting | Default | Notes |
 |---|---|---|
 | `connections.bidirectional` | **on** | Print each edge under *both* endpoints. Off = print each pair once (under the lower token) to ~halve connection tokens, at the cost of cross-referencing. Off is friendlier to large maps / tight context budgets; on is friendlier to weak LLMs. |
 | `connections.neighborsPerFeature` | 3 | Nearest-N kept per feature before planar pruning. |
 | `connections.inlineNeighborName` | **on** | Print the neighbour's name on each connection line. Off = `→ [03] — ~15m N, adjacent` (resolve token via header), saving ~25-30% of connection tokens at the cost of cross-referencing. Dumb-LLM insurance, same trade-off family as `bidirectional`. |
-| `distance.showWalkTime` | off | Append `~Nmin` walk time (derived from metres at a configurable pace). Off by default — the bucket word already proxies effort, and once transit lands travel time is mode-dependent. |
+| `distance.showWalkTime` | off | Append `~Nmin` walk time (derived from metres at a configurable pace). Off by default: the bucket word already proxies effort, and once transit lands travel time is mode-dependent. |
 | `distance.buckets` | adjacent<25m · near<150m · short walk<500m · far≥500m | Cutoffs + labels both editable. |
 | `distance.showMeters` | on | If off, show only the bucket word. |
 | `bearing.winds` | 8 | 4 / 8 / 16-wind. |

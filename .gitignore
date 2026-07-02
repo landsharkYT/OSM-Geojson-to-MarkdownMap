@@ -27,6 +27,12 @@ web/public/dotnet/
 .claude/settings.local.json
 .opencode
 
+# superseded design-corpus / scaffold docs — kept locally, untracked (repo cleanup pass)
+OLDexamplemap.md
+docs/impl-step-*.md
+web/README.md
+web/public/icons.svg
+
 # playwright
 web/test-results/
 web/playwright-report/

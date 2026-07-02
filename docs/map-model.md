@@ -1,8 +1,8 @@
-# MapModel — the Generator's structured output (steps 1–2)
+# MapModel: the Generator's structured output (steps 1–2)
 
-The Generator builds a **MapModel** (structured data); the MarkdownMap is *rendered from*
-it, and the WASM module serializes it to JSON for the Explorer. One source of truth, two
-views. Lives in `MarkdownMap.Generator`. Serialized camelCase via System.Text.Json.
+The Generator builds a MapModel (structured data). The MarkdownMap is rendered from it, and
+the WASM module serializes it to JSON for the Explorer: one source of truth, two views.
+Lives in `MarkdownMap.Generator`. Serialized camelCase via System.Text.Json.
 
 ## Shape
 
@@ -26,7 +26,7 @@ TerrainEntry    : { name, kind ("water"|"park"|"barrier:<class>"), position, not
 ```
 
 Notes:
-- `markdown` is byte-identical to today's Generator output — the renderer reads MapModel
+- `markdown` is byte-identical to today's Generator output. The renderer reads MapModel,
   but the string must not change (the golden test enforces this).
 - Static prose (Directive Preamble, How-to-read) is produced by the renderer, not stored
   in the model. The renderer derives section presence from the data (`districts.length`,

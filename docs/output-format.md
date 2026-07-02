@@ -5,9 +5,9 @@ approve the shape. This doc is the spec behind it: every section's grammar, so t
 document is machine-parseable end to end, plus a worked example of how a consuming LLM
 reads it. The example below uses a fictional area ("Rivertown"); real exports stay local.
 
-The document is sections in fixed order: **Directive Preamble → How to read → Bounds →
-Terrain → Districts → Connections**. Free-text prose only appears inside the Directive
-Preamble and the "How to read" key (both addressed to the LLM); every other section is a
+The document is sections in fixed order: Directive Preamble → How to read → Bounds →
+Terrain → Districts → Connections. Free-text prose only appears inside the Directive
+Preamble and the "How to read" key, both addressed to the LLM; every other section is a
 line grammar.
 
 ## Line grammars
@@ -20,9 +20,9 @@ All fields are whitespace-stripped. `·` separates header fields, `—` precedes
 [NN] <name> (<category>)[ · on <street>][ · <district>]
 ```
 `^\[(\d+)\] (.+?) \((.+?)\)(?: · (?:on|near) (.+?))?(?: · (.+))?$`
-The `· on <street>` and `· <district>` segments are **optional** — present only when the
-source GeoJSON carries that data. (`near` instead of `on` signals a snapped/fallback
-street.) Generator v0 (POI-only input) emits just `[NN] <name> (<category>)`.
+The `· on <street>` and `· <district>` segments are optional, present only when the source
+GeoJSON carries that data. (`near` instead of `on` signals a snapped/fallback street.)
+Generator v0 (POI-only input) emits just `[NN] <name> (<category>)`.
 
 ### Connection
 ```
@@ -45,12 +45,12 @@ promoted: <count>
 clustered: ~<n> minor          (optional; omitted when 0)
 ```
 Key lines match `^(spine|promoted|clustered): (.+)$`. `<DIR>` is one of N–S / NE–SW /
-E–W / NW–SE. The **spine is a skeleton** — only the few highest-importance ("key")
-features, listed in axis order — not full membership. `promoted` is a **count**; exact
-membership is carried per feature in the Connection header's `· <district>` segment.
-(`across:` for cross-district links is deferred until barriers exist.)
+E–W / NW–SE. The spine is a skeleton: only the few highest-importance ("key") features,
+listed in axis order, not full membership. `promoted` is a count; exact membership is
+carried per feature in the Connection header's `· <district>` segment. (`across:` for
+cross-district links is deferred until barriers exist.)
 
-## Worked example — how a consuming LLM uses it
+## Worked example: how a consuming LLM uses it
 
 Given the party at `[05]`:
 

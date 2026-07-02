@@ -16,17 +16,18 @@ across a grid. The pretty picture may *cost* tokens and accuracy rather than add
 
 ## Decision
 
-The **primary** rendered form of the schematic is **structured connection text**:
-per-Feature adjacency blocks (Token, full name inline, category/district, and neighbor
-links each carrying distance + 8-wind bearing). The document is **Header + Districts +
-Connections**; no separate legend (names live in the blocks).
+The primary rendered form of the schematic is structured connection text: per-Feature
+adjacency blocks (Token, full name inline, category/district, and neighbor links each
+carrying distance and 8-wind bearing). The document is Header + Districts + Connections;
+no separate legend, since names live in the blocks.
 
-**Drawn ASCII art is deferred** to a later "nice view", appropriate for small maps.
+Drawn ASCII art is deferred to a later "nice view", appropriate for small maps.
 
 ## Consequences
 
 - Robust at any density; the highest-build-risk component (2D ASCII layout) is removed
   from v1.
 - Likely better LLM spatial reasoning and lower token cost than ASCII art.
-- We lose the at-a-glance human-readable picture for now. Acceptable — the primary
-  consumer is the model. ASCII can be layered on later without changing the data model.
+- We lose the at-a-glance human-readable picture for now, which is acceptable since the
+  primary consumer is the model. ASCII can be layered on later without changing the data
+  model.
