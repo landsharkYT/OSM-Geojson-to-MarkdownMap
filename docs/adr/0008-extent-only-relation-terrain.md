@@ -23,7 +23,7 @@ inner holes, no role logic (inner members sit inside the hull anyway).
 
 ## Consequences
 
-- Robust to bbox-clipped/open relations: a coordinate cloud always has a hull.
+- Works on bbox-clipped/open relations, since a coordinate cloud always has a hull.
 - Simple: no multipolygon stitching, just resolve member ways to points to hull.
 - Position-accurate: centroid/bbox of the hull give the right octant/edge.
 - Loses true shape: concave bodies are over-filled (a long lake's bend disappears) and area

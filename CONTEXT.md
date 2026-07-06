@@ -46,16 +46,17 @@ The parse-time classification of how scene-worthy a Feature is, distinct from ra
 [[importance-tier|importance]]. Set in the [[normalizer-stage-1|Normalizer]] from OSM tags,
 it sorts Features into three groups.
 
-**Core** always promotes: worship; civic institutions (school, library, hospital, post
-office, and singular institution buildings like a hospital, school, stadium, or station);
-historic sites; museums, galleries, and attractions; major venues; and the residential
-addresses of a neighbourhood (named piers and moorages in a waterfront community, dorms on
-a campus): the skeleton the party lives and moves among. Civic core is an allowlist of
-public institutions; everything else civic (a private practice, a healthcare clinic, a
-social facility, a department office, a campus hall) defaults to budgeted and competes, so
-an un-enumerated civic tag can never silently promote at institution rank.
+The core group always promotes: worship; civic institutions (school, library, hospital,
+post office, and singular institution buildings like a hospital, school, stadium, or
+station); historic sites; museums, galleries, and attractions; major venues; and the
+residential addresses of a neighbourhood (named piers and moorages in a waterfront
+community, dorms on a campus), the skeleton the party lives and moves among. Civic core is
+an allowlist of public institutions; everything else civic (a private practice, a
+healthcare clinic, a social facility, a department office, a campus hall) defaults to
+budgeted and competes, so an un-enumerated civic tag can never silently promote at
+institution rank.
 
-**Budgeted** Features compete for the [[promotion-budget]]. A campus hall
+Budgeted features compete for the [[promotion-budget]]. A campus hall
 (`building=university`/`college`) isn't core. A campus has dozens, so a hall is a budgeted
 venue-band destination that competes like a café, with a small footprint-area nudge so the
 big halls out-sort the annexes (ADR-0019). Within budgeted, interactive venues (food, shops,
@@ -66,7 +67,7 @@ core institution building). A district's cafés, shops, and halls win seats befo
 sculptures and offices, since a DM's party enters and goes to places, and only walks past
 art.
 
-**Clustered** covers residential and minor features.
+Residential and minor features are clustered by default and never compete for a token.
 
 This fixes the dense-extract failures where a private dental office ranked like a school
 and campus sculptures crowded out venues. It's model-affecting (it changes which Features

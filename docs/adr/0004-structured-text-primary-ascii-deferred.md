@@ -25,7 +25,7 @@ Drawn ASCII art is deferred to a later "nice view", appropriate for small maps.
 
 ## Consequences
 
-- Robust at any density; the highest-build-risk component (2D ASCII layout) is removed
+- Holds up at any density; the highest-build-risk component (2D ASCII layout) is removed
   from v1.
 - Likely better LLM spatial reasoning and lower token cost than ASCII art.
 - We lose the at-a-glance human-readable picture for now, which is acceptable since the

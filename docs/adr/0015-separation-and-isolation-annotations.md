@@ -32,8 +32,8 @@ the single strongest "you can't just walk this" cue.
 Annotate separation, never route. Distance stays honest crow-flies. We enrich the
 accessibility annotation and never claim a route exists or doesn't.
 
-1. Distance is unchanged: crow-flies meters, 8-wind, bucket. Cheap, honest, robust to
-   incomplete OSM. We don't build a routable network or report path distance, since OSM
+1. Distance is unchanged: crow-flies meters, 8-wind, bucket. Cheap, honest, and it still
+   works on incomplete OSM. We don't build a routable network or report path distance, since OSM
    extracts routinely lack the path data, and a computed "route" over a missing network
    would mislead more confidently than crow-flies does.
 

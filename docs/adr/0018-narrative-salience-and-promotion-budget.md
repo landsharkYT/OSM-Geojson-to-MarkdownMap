@@ -3,11 +3,11 @@
 Date: 2026-07-01
 Status: Accepted
 
-> **Refined by ADR-0019.** Institutional buildings: singular institutions/stations/dorm buildings
+> Refined by ADR-0019. Institutional buildings: singular institutions/stations/dorm buildings
 > join the core, while `building=university`/`college` campus halls are budgeted venue-band
 > competitors with a footprint-area nudge, so a campus's 100+ halls don't flood the budget.
 >
-> **Update 2026-07-01: civic salience is an allowlist, not a denylist.** `SalienceClassifier` keyed
+> Update 2026-07-01: civic salience is an allowlist, not a denylist. `SalienceClassifier` keyed
 > `civic` as core unless explicitly budgeted, so `healthcare=*` passthrough (psychotherapist,
 > physiotherapist, alternative) and `amenity=social_facility` silently fell through to core at
 > importance 90: always promoted, bypassing the budget, flooding a medical-dense district. Inverted

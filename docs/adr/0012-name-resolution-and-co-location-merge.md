@@ -21,31 +21,31 @@ The contract carries only the resolved `name` (plus `category`/`tier`), not the 
 
 ## Decision
 
-**Name resolution (Normalizer).** Resolve a Feature's name as `name → brand → operator`,
+In the Normalizer, name resolution resolves a Feature's name as `name → brand → operator`,
 preferring `short_name` when a `name` is long. A name derived from `brand`/`operator` counts
 as named for promotion and gets the importance `+10`. `ref`/`addr:housename` are excluded,
 since they're codes, not friendly names. There's no length-based truncation: chopping proper
 names trades real ambiguity for trivial token savings.
 
-**Co-location merge (Normalizer).** One pass collapses duplicates within a conservative
+Also in the Normalizer, a co-location merge pass collapses duplicates within a conservative
 radius (~30–50 m) under a same-category-class guard. An unnamed Feature near a named one of
 compatible category folds into it; two Features with the same name collapse to one
 (preferring the point, or the higher-importance one).
 
-**Tiered unnamed promotion.** A Feature still unnamed after resolution promotes to its own
-token only at landmark tier; unnamed destination/lower Features are demoted to a District's
-clustered count. This is a fixed default, not a toggle, since it's model-affecting, unlike
-the render-only settings (ADR-0011).
+Unnamed features get tiered promotion: a Feature still unnamed after resolution promotes to
+its own token only at landmark tier, while unnamed destination/lower Features are demoted to
+a District's clustered count. This is a fixed default, not a toggle, since it's
+model-affecting, unlike the render-only settings (ADR-0011).
 
-> **Refined (2026-07-01):** tightened to its intent. An unnamed Feature promotes only if
-> it's worship (the "the church" case above); every other unnamed Feature clusters, since
-> real extracts promoted piles of nameless `swimming pool` / `maritime` category-label
-> tokens. See CONTEXT under *Unnamed promotion (worship-only)*.
+> Refined 2026-07-01, tightened to its intent: an unnamed Feature promotes only if it's
+> worship (the "the church" case above); every other unnamed Feature clusters, since real
+> extracts promoted piles of nameless `swimming pool` / `maritime` category-label tokens.
+> See CONTEXT under *Unnamed promotion (worship-only)*.
 
-**Unnamed fallback label (Generator, render-only).** Whatever remains unnamed renders as
-its humanized category subclass, lowercase (`place of worship`), with the redundant
-`(category)` suppressed on those lines. It needs only `category`, so it re-renders live and
-keeps the SVG token labels and the markdown consistent.
+Finally, the Generator handles the unnamed fallback label, render-only: whatever remains
+unnamed renders as its humanized category subclass, lowercase (`place of worship`), with the
+redundant `(category)` suppressed on those lines. It needs only `category`, so it re-renders
+live and keeps the SVG token labels and the markdown consistent.
 
 ## Consequences
 

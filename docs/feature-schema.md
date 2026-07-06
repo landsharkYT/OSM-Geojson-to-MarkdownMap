@@ -94,25 +94,28 @@ Base 45 keeps them below interactive venues (food/shops score ≈ 65 with a name
 cafés and shops win the budget before its sculptures do (a DM's party enters buildings, walks past art).
 
 Narrative salience (ADR-0018) is computed from the `category` (see `SalienceClassifier`) and decides
-promotion; `tier`/`importance` only order features:
-- **Core**: worship; civic institutions (an allowlist of school, college, university, library,
-  hospital, post office, townhall, police, fire station, courthouse, community centre, kindergarten);
-  singular institution buildings (`building`=school/hospital/civic/fire_station/stadium, and a named
-  station); dorms (`amenity`=student_accommodation or `building`=dormitory); historic;
-  museum/gallery/attraction; major leisure venues (marina, stadium, sports centre, golf course).
-  Always promoted.
-- **Budgeted**: commemorative landmarks (artwork, viewpoint, memorial, monument, base 45); food;
-  shops; campus halls (`building`=university/college, base 55 plus footprint nudge, since there are
-  many per campus so they compete like venues, ADR-0019); private/other civic (dentist, clinic,
-  doctors, pharmacy, veterinary, `healthcare`=* passthrough, social_facility, i.e. everything civic not in
-  the core allowlist, base 55); leisure facilities (pool, ice rink, gym, playground, pitch, but not
-  the marina/stadium/sports-centre/golf venues, which are core); lodging. Promoted only if it wins the
-  per-District promotion budget (top-K by importance); the rest cluster. Venues, including halls,
-  outrank commemoratives.
-- **Clustered**: residential, plus the `minor`/`structure` tiers. Count only.
-- **Unnamed promotion (worship-only, ADR-0012 refined)**: an unnamed feature earns a token only if
-  it's worship ("the church"). Every other unnamed feature clusters regardless of its salience, so a
-  campus's nameless pool basins, sculptures, and out-buildings never become category-label tokens.
+promotion; `tier`/`importance` only order features.
+
+`core` always promotes: worship; civic institutions (an allowlist of school, college, university,
+library, hospital, post office, townhall, police, fire station, courthouse, community centre,
+kindergarten); singular institution buildings (`building`=school/hospital/civic/fire_station/stadium,
+and a named station); dorms (`amenity`=student_accommodation or `building`=dormitory); historic;
+museum/gallery/attraction; major leisure venues (marina, stadium, sports centre, golf course).
+
+`budgeted` competes for a promoted token, up to the per-District budget (top-K by importance); the
+rest cluster. It covers commemorative landmarks (artwork, viewpoint, memorial, monument, base 45);
+food; shops; campus halls (`building`=university/college, base 55 plus footprint nudge, since there
+are many per campus so they compete like venues, ADR-0019); private/other civic (dentist, clinic,
+doctors, pharmacy, veterinary, `healthcare`=* passthrough, social_facility, i.e. everything civic not
+in the core allowlist, base 55); leisure facilities (pool, ice rink, gym, playground, pitch, but not
+the marina/stadium/sports-centre/golf venues, which are core); and lodging. Venues, including halls,
+outrank commemoratives.
+
+`clustered` is count-only: residential, plus the `minor`/`structure` tiers.
+
+Unnamed promotion (worship-only, ADR-0012 refined): an unnamed feature earns a token only if
+it's worship ("the church"). Every other unnamed feature clusters regardless of its salience, so a
+campus's nameless pool basins, sculptures, and out-buildings never become category-label tokens.
 
 ## 6. Polygon → point, de-duplication, street snap
 

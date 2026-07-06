@@ -11,8 +11,8 @@ is dense and unevenly distributed: a to-scale grid is mostly empty cells, collis
 prone where features cluster, token-explosive, and hard for an LLM to read.
 
 The alternative, a purely topological sketch (nodes + connections, like a hand-authored
-schematic), is readable and robust, but it throws away distance, which the LLM needs to
-pace a scene.
+schematic), reads fine and doesn't break under messy data, but it throws away distance,
+which the LLM needs to pace a scene.
 
 ## Decision
 

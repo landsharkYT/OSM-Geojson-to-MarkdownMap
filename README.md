@@ -40,16 +40,18 @@ Two stages, connected only by GeoJSON:
                 (OSM-aware)              (contract)    (OSM-agnostic)          (+ scene-chunks)
 ```
 
-- **Normalizer** streams an OSM extract, drops noise, classifies tags into categories and
-  importance scores, resolves names, snaps streets to nearby POIs, and builds terrain shapes.
-  It's the only part of the pipeline that knows OSM's tag schema.
-- **Generator** takes that GeoJSON and builds the actual map: which features get promoted,
-  how they connect, how districts are grouped, where terrain sits. It renders the MarkdownMap
-  from that model, so changing a display setting doesn't require re-parsing anything.
-- **Contract** is the shared GeoJSON schema both stages agree on.
-- **Explorer** (`web/`) is a React app that runs the whole pipeline client-side in the browser,
-  using a .NET-compiled-to-WASM build of the Normalizer and Generator, and draws the map next
-  to the MarkdownMap text.
+The Normalizer streams an OSM extract, drops noise, classifies tags into categories and
+importance scores, resolves names, snaps streets to nearby POIs, and builds terrain shapes.
+It's the only part of the pipeline that knows OSM's tag schema.
+
+The Generator takes that GeoJSON and builds the actual map: which features get promoted, how
+they connect, how districts are grouped, where terrain sits. It renders the MarkdownMap from
+that model, so changing a display setting doesn't require re-parsing anything. Contract is
+just the shared GeoJSON schema both stages agree on.
+
+Explorer (`web/`) is a React app that runs the whole pipeline client-side in the browser,
+using a .NET-compiled-to-WASM build of the Normalizer and Generator, and draws the map next
+to the MarkdownMap text.
 
 ## What it does
 
